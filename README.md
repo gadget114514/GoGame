@@ -5,6 +5,8 @@ desktop app. Stones are chess pieces whose rank grows from pawn to queen based
 on the KataGo ownership/weight estimate, and the board surface is tinted by the
 predicted territory.
 
+**Play online:** https://gadget114514.github.io/GoGame/
+
 ## Features
 
 - **Board sizes**: 9×9, 13×13, 19×19 (selectable at runtime).
@@ -67,6 +69,8 @@ The production app serves `dist/` through a privileged `app://` protocol so that
 `fetch()` and TensorFlow.js model loading work without a local HTTP server.
 
 ## GitHub Pages
+
+The live site is https://gadget114514.github.io/GoGame/.
 
 Push to `main`. `.github/workflows/deploy.yml` builds and deploys `dist/` using
 GitHub's Pages actions. `vite.config.ts` uses `base: './'`, so project sites
