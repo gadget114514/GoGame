@@ -553,9 +553,10 @@ export class Board3D {
 
           const isJustPlaced = isNewMove && index === state.goban.lastMove && !wasExisting;
           if (isJustPlaced) {
-            this.animatePlacement(root, targetY, () => {
+            this.animatePlacement(root, targetY, color, () => {
               const pieceColor = color === WHITE ? WHITE_MOVE_COLOR : BLACK_MOVE_COLOR;
-              this.spawnBurst(new Vector3(targetX, 0.16, targetZ), pieceColor, 48, 2.6);
+              this.spawnBurst(new Vector3(targetX, 0.16, targetZ), pieceColor, 54, 2.8);
+              this.spawnShockwave(new Vector3(targetX, 0.04, targetZ), pieceColor);
               this.lastMovePulseAt = performance.now();
             });
           }
@@ -821,7 +822,98 @@ export class Board3D {
     head.isPickable = false;
   }
 
-  private animatePlacement(root: TransformNode, targetY: number, onComplete?: () => void): void {
+  private spawnPlacementTrail(
+    root: TransformNode,
+    color: number
+  ): { stop: () => void; dispose: () => void } {
+    const anchor = MeshBuilder.CreateBox(
+      `trail-anchor-${this.effectSeed++}`,
+      { size: 0.01 },
+      this.scene
+    );
+    anchor.isVisible = false;
+    anchor.isPickable = false;
+    anchor.parent = root;
+    anchor.position.set(0, 0, 0);
+
+    const particles = new ParticleSystem(
+      `placement-trail-${this.effectSeed++}`,
+      160,
+      this.scene
+    );
+    particles.particleTexture = this.particleTexture;
+    particles.emitter = anchor;
+
+    // Golden amber stardust for Black, celestial cyan starlight for White
+    const isBlack = color === BLACK;
+    if (isBlack) {
+      particles.color1 = new Color4(1.0, 0.78, 0.22, 1.0);
+      particles.color2 = new Color4(1.0, 0.48, 0.1, 0.85);
+      particles.colorDead = new Color4(0.8, 0.25, 0.02, 0);
+    } else {
+      particles.color1 = new Color4(0.65, 0.9, 1.0, 1.0);
+      particles.color2 = new Color4(0.92, 0.96, 1.0, 0.9);
+      particles.colorDead = new Color4(0.35, 0.65, 0.95, 0);
+    }
+
+    particles.minSize = 0.05;
+    particles.maxSize = 0.18;
+    particles.minLifeTime = 0.28;
+    particles.maxLifeTime = 0.65;
+    particles.emitRate = 140; // Continuous stream of sparkling particles while descending
+    particles.blendMode = ParticleSystem.BLENDMODE_ADD;
+
+    particles.minEmitBox = new Vector3(-0.09, -0.05, -0.09);
+    particles.maxEmitBox = new Vector3(0.09, 0.05, 0.09);
+
+    particles.direction1 = new Vector3(-0.45, 0.2, -0.45);
+    particles.direction2 = new Vector3(0.45, 1.0, 0.45);
+
+    particles.minEmitPower = 0.2;
+    particles.maxEmitPower = 0.8;
+    particles.gravity = new Vector3(0, -0.6, 0);
+
+    particles.minAngularSpeed = -4;
+    particles.maxAngularSpeed = 4;
+    particles.updateSpeed = 0.014;
+
+    particles.start();
+
+    return {
+      stop: () => {
+        particles.stop();
+      },
+      dispose: () => {
+        try {
+          particles.stop();
+          window.setTimeout(() => {
+            try {
+              particles.dispose();
+              anchor.dispose();
+            } catch {
+              // Ignore if already disposed
+            }
+          }, 800);
+        } catch {
+          // Ignore
+        }
+      }
+    };
+  }
+
+  private animatePlacement(
+    root: TransformNode,
+    targetY: number,
+    color: number,
+    onComplete?: () => void
+  ): void {
+    let trail: { stop: () => void; dispose: () => void } | null = null;
+    try {
+      trail = this.spawnPlacementTrail(root, color);
+    } catch {
+      // Particles are purely cosmetic.
+    }
+
     try {
       const startY = targetY + 3.4;
       root.position.y = startY;
@@ -897,10 +989,13 @@ export class Board3D {
       this.scene.beginAnimation(root, 0, 34, false, 1.0, () => {
         root.position.y = targetY;
         root.scaling.set(origScaleX, origScaleY, origScaleZ);
+        trail?.stop();
+        trail?.dispose();
         onComplete?.();
       });
     } catch {
       root.position.y = targetY;
+      trail?.dispose();
       onComplete?.();
     }
   }

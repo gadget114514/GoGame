@@ -276,6 +276,23 @@ export class Board2D {
         ctx.strokeStyle = color === BLACK ? `rgba(217, 160, 102, ${rippleAlpha})` : `rgba(180, 210, 245, ${rippleAlpha})`;
         ctx.lineWidth = Math.max(1.5, this.cell * 0.04);
         ctx.stroke();
+
+        // Radiate stardust sparkle particles while landing
+        const count = 8;
+        for (let i = 0; i < count; i++) {
+          const angle = (i / count) * Math.PI * 2 + animProgress * 2.8;
+          const dist = radius * (0.8 + 1.1 * animProgress);
+          const px = x + Math.cos(angle) * dist;
+          const py = y + Math.sin(angle) * dist;
+          const pSize = Math.max(1.4, this.cell * 0.055 * (1 - animProgress));
+          ctx.beginPath();
+          ctx.arc(px, py, pSize, 0, Math.PI * 2);
+          ctx.fillStyle =
+            color === BLACK
+              ? `rgba(245, 158, 11, ${rippleAlpha})`
+              : `rgba(56, 189, 248, ${rippleAlpha})`;
+          ctx.fill();
+        }
       }
     }
 
