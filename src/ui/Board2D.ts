@@ -4,11 +4,66 @@ import { starPoints, COORD_LETTERS } from '../game/BoardSize';
 import { heatColor } from './heatmap';
 import { pieceRank } from './pieceRank';
 
+export interface Board2DLayout {
+  originX: number;
+  originY: number;
+  cell: number;
+  span: number;
+  pad: number;
+  boardExtent: number;
+}
+
+export function computeBoard2DLayout(
+  width: number,
+  height: number,
+  size: number
+): Board2DLayout {
+  const minDim = Math.min(width, height);
+  const extent = minDim * 0.85;
+  const cell = extent / Math.max(1, size - 1);
+  const span = (size - 1) * cell;
+  const pad = cell * 0.7;
+  const originX = (width - span) / 2;
+  const originY = (height - span) / 2;
+  const boardExtent = span + pad * 2;
+  return { originX, originY, cell, span, pad, boardExtent };
+}
+
+export function board2dCoordToCanvas(
+  col: number,
+  row: number,
+  size: number,
+  layout: Board2DLayout,
+  perspective: 'black' | 'white'
+): { x: number; y: number } {
+  const drawCol = perspective === 'white' ? size - 1 - col : col;
+  const drawRow = perspective === 'white' ? size - 1 - row : row;
+  return {
+    x: layout.originX + drawCol * layout.cell,
+    y: layout.originY + drawRow * layout.cell
+  };
+}
+
+export function board2dCanvasToCoord(
+  canvasX: number,
+  canvasY: number,
+  size: number,
+  layout: Board2DLayout,
+  perspective: 'black' | 'white'
+): { col: number; row: number } {
+  const rawCol = Math.round((canvasX - layout.originX) / layout.cell);
+  const rawRow = Math.round((canvasY - layout.originY) / layout.cell);
+  const col = perspective === 'white' ? size - 1 - rawCol : rawCol;
+  const row = perspective === 'white' ? size - 1 - rawRow : rawRow;
+  return { col, row };
+}
+
 export class Board2D {
   private ctx: CanvasRenderingContext2D;
   private cssWidth = 1;
   private cssHeight = 1;
-  private margin = 0;
+  private originX = 0;
+  private originY = 0;
   private cell = 1;
   private size = 19;
   private goban: Goban | null = null;
@@ -20,12 +75,17 @@ export class Board2D {
 
   private prevMoveCount = 0;
   private lastMoveAnimStartTime = 0;
+  private resizeObserver: ResizeObserver | null = null;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const context = canvas.getContext('2d');
     if (!context) throw new Error('2D canvas is not supported');
     this.ctx = context;
     window.addEventListener('resize', this.resize);
+    if (typeof ResizeObserver !== 'undefined' && canvas.parentElement) {
+      this.resizeObserver = new ResizeObserver(() => this.resize());
+      this.resizeObserver.observe(canvas.parentElement);
+    }
     canvas.addEventListener('pointerup', (event) => this.onPointerUp(event));
     canvas.addEventListener('pointermove', (event) => this.onPointerMove(event));
     canvas.addEventListener('pointerleave', () => this.onPointerLeave());
@@ -76,26 +136,44 @@ export class Board2D {
   }
 
   private layout(): void {
-    const extent = Math.min(this.cssWidth, this.cssHeight) * 0.86;
-    this.margin = (Math.min(this.cssWidth, this.cssHeight) - extent) / 2;
-    this.cell = extent / Math.max(1, this.size - 1);
+    const layout = computeBoard2DLayout(this.cssWidth, this.cssHeight, this.size);
+    this.originX = layout.originX;
+    this.originY = layout.originY;
+    this.cell = layout.cell;
   }
 
   private coordToCanvas(col: number, row: number): { x: number; y: number } {
-    const drawCol = this.perspective === 'white' ? this.size - 1 - col : col;
-    const drawRow = this.perspective === 'white' ? this.size - 1 - row : row;
-    return {
-      x: this.margin + drawCol * this.cell,
-      y: this.margin + drawRow * this.cell
-    };
+    return board2dCoordToCanvas(
+      col,
+      row,
+      this.size,
+      {
+        originX: this.originX,
+        originY: this.originY,
+        cell: this.cell,
+        span: (this.size - 1) * this.cell,
+        pad: this.cell * 0.7,
+        boardExtent: (this.size - 1) * this.cell + this.cell * 1.4
+      },
+      this.perspective
+    );
   }
 
   private canvasToCoord(canvasX: number, canvasY: number): { col: number; row: number } {
-    const rawCol = Math.round((canvasX - this.margin) / this.cell);
-    const rawRow = Math.round((canvasY - this.margin) / this.cell);
-    const col = this.perspective === 'white' ? this.size - 1 - rawCol : rawCol;
-    const row = this.perspective === 'white' ? this.size - 1 - rawRow : rawRow;
-    return { col, row };
+    return board2dCanvasToCoord(
+      canvasX,
+      canvasY,
+      this.size,
+      {
+        originX: this.originX,
+        originY: this.originY,
+        cell: this.cell,
+        span: (this.size - 1) * this.cell,
+        pad: this.cell * 0.7,
+        boardExtent: (this.size - 1) * this.cell + this.cell * 1.4
+      },
+      this.perspective
+    );
   }
 
   private render(): void {
@@ -107,12 +185,26 @@ export class Board2D {
 
     const span = (this.size - 1) * this.cell;
     const pad = this.cell * 0.7;
-    const x0 = this.margin - pad;
-    const y0 = this.margin - pad;
+    const x0 = this.originX - pad;
+    const y0 = this.originY - pad;
     const boardExtent = span + pad * 2;
 
+    // Board drop shadow
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = Math.max(16, this.cell * 0.5);
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = Math.max(6, this.cell * 0.18);
     ctx.fillStyle = '#c99755';
     ctx.fillRect(x0, y0, boardExtent, boardExtent);
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Board wood rim border
+    ctx.strokeStyle = '#8a5e2f';
+    ctx.lineWidth = Math.max(1.5, this.cell * 0.04);
+    ctx.strokeRect(x0, y0, boardExtent, boardExtent);
 
     // Board Coordinates
     const last = this.goban?.lastMove ?? null;
@@ -125,7 +217,8 @@ export class Board2D {
     const isWhite = this.perspective === 'white';
 
     for (let i = 0; i < this.size; i++) {
-      const pos = this.margin + i * this.cell;
+      const posX = this.originX + i * this.cell;
+      const posY = this.originY + i * this.cell;
 
       // Column labels (top and bottom border)
       // For Black: Left is 1, Right is size (Top-Left is 1,1; Bottom-Right is size,size)
@@ -140,8 +233,8 @@ export class Board2D {
         ? `bold ${Math.max(12, this.cell * 0.38)}px "Segoe UI", -apple-system, system-ui, sans-serif`
         : `700 ${Math.max(11, this.cell * 0.34)}px "Segoe UI", -apple-system, system-ui, sans-serif`;
 
-      ctx.fillText(colStr, pos, this.margin - labelPad);
-      ctx.fillText(colStr, pos, this.margin + span + labelPad);
+      ctx.fillText(colStr, posX, this.originY - labelPad);
+      ctx.fillText(colStr, posX, this.originY + span + labelPad);
 
       // Row labels (left and right border)
       // For Black: Top is 1, Bottom is size (Top-Left is 1,1; Bottom-Right is size,size)
@@ -156,8 +249,8 @@ export class Board2D {
         ? `bold ${Math.max(12, this.cell * 0.38)}px "Segoe UI", -apple-system, system-ui, sans-serif`
         : `700 ${Math.max(11, this.cell * 0.34)}px "Segoe UI", -apple-system, system-ui, sans-serif`;
 
-      ctx.fillText(rowStr, this.margin - labelPad, pos);
-      ctx.fillText(rowStr, this.margin + span + labelPad, pos);
+      ctx.fillText(rowStr, this.originX - labelPad, posY);
+      ctx.fillText(rowStr, this.originX + span + labelPad, posY);
     }
 
     // Grid.
@@ -165,11 +258,13 @@ export class Board2D {
     ctx.lineWidth = Math.max(1, this.cell * 0.035);
     ctx.beginPath();
     for (let i = 0; i < this.size; i++) {
-      const offset = this.margin + i * this.cell;
-      ctx.moveTo(this.margin, offset);
-      ctx.lineTo(this.margin + span, offset);
-      ctx.moveTo(offset, this.margin);
-      ctx.lineTo(offset, this.margin + span);
+      const y = this.originY + i * this.cell;
+      ctx.moveTo(this.originX, y);
+      ctx.lineTo(this.originX + span, y);
+
+      const x = this.originX + i * this.cell;
+      ctx.moveTo(x, this.originY);
+      ctx.lineTo(x, this.originY + span);
     }
     ctx.stroke();
 
@@ -383,6 +478,7 @@ export class Board2D {
   }
 
   dispose(): void {
+    this.resizeObserver?.disconnect();
     window.removeEventListener('resize', this.resize);
   }
 }
