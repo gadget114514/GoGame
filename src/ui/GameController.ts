@@ -174,6 +174,9 @@ export class GameController {
     this.evalGraphEnabled = localStorage.getItem('gogame:evalGraph') !== 'false';
     this.els.toggleEvalGraph.checked = this.evalGraphEnabled;
 
+    const savedView = (localStorage.getItem('gogame:view') as ViewMode) || '3d';
+    this.view = savedView;
+
     const initialLang = detectInitialLanguage();
     setLanguage(initialLang);
     this.els.languageSelect.value = initialLang;
@@ -209,6 +212,7 @@ export class GameController {
     this.wireControls();
     this.wireKeyboard();
     this.applyLanguage();
+    this.applyView();
     this.render();
     this.updateStatus();
 
@@ -431,12 +435,24 @@ export class GameController {
 
   private toggleView(): void {
     this.view = this.view === '3d' ? '2d' : '3d';
+    localStorage.setItem('gogame:view', this.view);
+    this.applyView();
+  }
+
+  private applyView(): void {
     const show3d = this.view === '3d';
     this.els.canvas3d.hidden = !show3d;
     this.els.canvas2d.hidden = show3d;
+    this.els.canvas3d.style.display = show3d ? 'block' : 'none';
+    this.els.canvas2d.style.display = show3d ? 'none' : 'block';
     this.updateViewButtonText();
-    if (show3d) this.board3d.resize();
-    else {
+    const legend = document.getElementById('rank-legend');
+    if (legend) {
+      legend.style.display = !show3d || this.els.pieceStyle.value === 'stones' ? 'none' : '';
+    }
+    if (show3d) {
+      this.board3d.resize();
+    } else {
       this.board2d.resize();
       this.render();
     }
