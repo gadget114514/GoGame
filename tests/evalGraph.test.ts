@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateLeadBound, type EvalPoint } from '../src/ui/EvalGraph';
+import { calculateLeadBound, formatEvalTooltip, type EvalPoint } from '../src/ui/EvalGraph';
 import { setLanguage, t } from '../src/i18n';
 
 describe('EvalGraph evaluation bounds and formatting', () => {
@@ -55,5 +55,29 @@ describe('EvalGraph evaluation bounds and formatting', () => {
       expect(tooltip).toContain('10');
       expect(tooltip).toContain('65.0');
     }
+  });
+
+  it('correctly calculates winning side percentage for both Black and White', () => {
+    setLanguage('ja');
+    // Black favored (65%)
+    const blackFavored: EvalPoint = { moveNum: 10, winrate: 0.65, scoreLead: 3.5 };
+    const bResult = formatEvalTooltip(blackFavored);
+    expect(bResult.side).toBe('黒');
+    expect(bResult.rate).toBe('65.0');
+    expect(bResult.lead).toBe('黒 +3.5');
+
+    // White favored (winrate = 0.05 -> White 95%, scoreLead = -8.2)
+    const whiteFavored: EvalPoint = { moveNum: 25, winrate: 0.05, scoreLead: -8.2 };
+    const wResult = formatEvalTooltip(whiteFavored);
+    expect(wResult.side).toBe('白');
+    expect(wResult.rate).toBe('95.0');
+    expect(wResult.lead).toBe('白 +8.2');
+
+    // White crushing (winrate = 0.002 -> White 99.8%)
+    const whiteCrushing: EvalPoint = { moveNum: 50, winrate: 0.002, scoreLead: -25.0 };
+    const cResult = formatEvalTooltip(whiteCrushing);
+    expect(cResult.side).toBe('白');
+    expect(cResult.rate).toBe('99.8');
+    expect(cResult.lead).toBe('白 +25.0');
   });
 });

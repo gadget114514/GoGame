@@ -20,6 +20,19 @@ export function calculateLeadBound(points: Iterable<EvalPoint>): number {
   return Math.min(60, Math.ceil((maxAbsLead + 2) / 5) * 5);
 }
 
+export function formatEvalTooltip(point: EvalPoint): { rate: string; side: string; lead: string } {
+  const isBlackFavored = point.winrate >= 0.5;
+  const displayWinrate = isBlackFavored ? point.winrate : 1 - point.winrate;
+  const rate = (displayWinrate * 100).toFixed(1);
+  const lead = point.scoreLead;
+  const leadStr =
+    Math.abs(lead) < 0.05
+      ? t('evalGraphEven')
+      : `${lead > 0 ? t('blackWinShort') : t('whiteWinShort')} +${Math.abs(lead).toFixed(1)}`;
+  const side = isBlackFavored ? t('blackWinShort') : t('whiteWinShort');
+  return { rate, side, lead: leadStr };
+}
+
 export class EvalGraph {
   private readonly ctx: CanvasRenderingContext2D;
   private points = new Map<number, EvalPoint>();
@@ -198,18 +211,12 @@ export class EvalGraph {
     const activeMove = this.hoverMove !== null ? this.hoverMove : this.currentStep;
     const pt = this.points.get(activeMove);
     if (pt) {
-      const winPct = (pt.winrate * 100).toFixed(1);
-      const lead = pt.scoreLead;
-      const leadStr =
-        Math.abs(lead) < 0.05
-          ? t('evalGraphEven')
-          : `${lead > 0 ? t('blackWinShort') : t('whiteWinShort')} +${Math.abs(lead).toFixed(1)}`;
-      const side = pt.winrate >= 0.5 ? t('blackWinShort') : t('whiteWinShort');
+      const { rate, side, lead } = formatEvalTooltip(pt);
       this.infoEl.textContent = t('evalGraphTooltip', {
         move: activeMove,
-        rate: winPct,
+        rate,
         side,
-        lead: leadStr
+        lead
       });
     } else {
       this.infoEl.textContent = t('evalGraphNoData', { move: activeMove });

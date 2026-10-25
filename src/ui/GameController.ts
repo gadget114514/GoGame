@@ -947,7 +947,10 @@ export class GameController {
           ? t('even')
           : `${lead > 0 ? 'B' : 'W'} +${Math.abs(lead).toFixed(1)}`;
       const win = activeEval.winrate;
-      const winLabel = `${(win * 100).toFixed(0)}% B`;
+      const isBlackFavored = win >= 0.5;
+      const winPct = ((isBlackFavored ? win : 1 - win) * 100).toFixed(0);
+      const winSide = isBlackFavored ? 'B' : 'W';
+      const winLabel = `${winPct}% ${winSide}`;
       const padded = activeEval.padded ? ` · ${t('paddedNet')}` : '';
       const isHover = this.hoverEvaluation !== null && this.hoverIndex !== null;
       const hoverPrefix = isHover
@@ -961,7 +964,10 @@ export class GameController {
           ? t('even')
           : `${lead > 0 ? 'B' : 'W'} +${Math.abs(lead).toFixed(1)}`;
       const win = fallbackPoint.winrate;
-      const winLabel = `${(win * 100).toFixed(0)}% B`;
+      const isBlackFavored = win >= 0.5;
+      const winPct = ((isBlackFavored ? win : 1 - win) * 100).toFixed(0);
+      const winSide = isBlackFavored ? 'B' : 'W';
+      const winLabel = `${winPct}% ${winSide}`;
       this.els.score.textContent = `${label} · ${winLabel}`;
     } else {
       this.els.score.textContent = '';
