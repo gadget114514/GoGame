@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en"i style="touch-action: none;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="user-scalable=0">
+  <meta name="description" content="Game of Go - A progressive web application that runs in a web browser or as a native Android application. Improve your Go/Weiqi/Baduk skills by playing this app.">
+  <meta name="keyword" content="go, weiqi, baduk, game of go, katago, neural net, web browser, android application, free, ad-free">
+  <base href="/go/">
+  <link rel="manifest" href="/go/manifest.json">
+  <link rel="stylesheet" href="css/styles.css">
+  <title>Go</title>
+</head>
+<body>
+  <div id="controls"></div>
+  <div class="container"><div id="goban"></div></div>
+  <button onclick="handleDB();">Toggle Games Database</button>
+  <a href="/go/analyzer.html">Analyze</a>
+  <div id="stats" style="font-size: 38px; margin-bottom: 2%;"></div>
+  <script src="js/tensorflow.js"></script>
+  <script src="js/goban.js"></script>
+  <script src="js/games_black.js"></script>
+  <script src="js/games_white.js"></script>
+  <script src="js/gui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

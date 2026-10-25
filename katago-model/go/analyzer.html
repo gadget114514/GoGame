@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en"i style="touch-action: none;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="user-scalable=0">
+  <meta name="description" content="Go/Weiqi/Baduk SGF game AI performance analyzer">
+  <meta name="keyword" content="go, weiqi, baduk, game of go, katago, neural net, web browser, android application, free, ad-free">
+  <base href="/go/">
+  <link rel="stylesheet" href="css/styles.css">
+  <title>Game analyzer</title>
+</head>
+<body align="center">
+  <div id="controls"></div>
+  <div class="container"><div id="goban"></div></div>
+  <a href="/go/index.html">Play</a>
+  <div id="stats" style="font-size: 38px; margin-bottom: 2%;"></div>
+  <script src="js/tensorflow.js"></script>
+  <script src="js/goban.js"></script>
+  <script src="js/games_black.js"></script>
+  <script src="js/games_white.js"></script>
+  <script src="js/gui.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/go/service-worker.js')
+    }
+
+    tf.setBackend('webgl').then(() => {
+      if (tf.getBackend() !== 'webgl') {
+        tf.setBackend('cpu');
+      }
+    });
+    function gameMoves() { return; }
+    function userInput() { return; }
+    initGUI = initAnalyzer;
+    
+    // Load SGF
+    function loadGame() {
+      let sgf = document.getElementById('sgf').value;
+      initGoban();
+      loadSgf(sgf);
+      analyzeGame();
+    }
+
+    // Measure average move choice
+    async function analyzeGame() {
+      let blackScores = [];
+      let whiteScores = [];
+      firstMove();
+      let moveFrom = document.getElementById('moveFrom').value;
+      let moveTo = document.getElementById('moveTo').value;
+      moveFrom = moveFrom == 'First' ? 1 : parseInt(moveFrom);
+      moveTo = moveTo == 'Last' ? moveHistory.length : parseInt(moveTo);
+      for (let i = 1; i < moveHistory.length; i++) {
+        if (i < moveFrom) { nextMove(); drawBoard(); continue; }
+        if (i > moveTo) break;
+        let move_21 = moveHistory[i].move;
+        let row_21 = Math.floor(move_21 / 21);
+        let col_21 = move_21 % 21;
+        let move_19 = (row_21-1)*19+(col_21-1);
+        let score = await movePolicy(move_19);
+        document.getElementById('stats').innerHTML = 'Move ' + i + ' is NN choice #' + score;
+        if (i % 2) blackScores.push(score);
+        else whiteScores.push(score);
+        nextMove();
+        drawBoard();
+        await new Promise(requestAnimationFrame);
+      }
+      let blackPerformance = 0;
+      let whitePerformance = 0;
+      for (let i = 0; i < blackScores.length; i++) blackPerformance += blackScores[i];
+      for (let i = 0; i < whiteScores.length; i++) whitePerformance += whiteScores[i];
+      blackPerformance = Math.floor(blackPerformance / blackScores.length);
+      whitePerformance = Math.floor(whitePerformance / whiteScores.length);
+      let blackRank = blackPerformance < 10 ? ((10-blackPerformance) + 'd') : ((blackPerformance - 9) + 'k');
+      let whiteRank = whitePerformance < 10 ? ((10-whitePerformance) + 'd') : ((whitePerformance - 9) + 'k');
+      document.getElementById('stats').innerHTML = `
+        BLACK ~ OGS ` + blackRank +
+       `, WHITE ~ OGS ` + whiteRank;
+    }
+
+    // Get current move choice from NN
+    async function movePolicy(move) {
+      const binInputs = inputTensor();
+      try {
+        const model = await danModel;
+        const results = await model.executeAsync({
+            "swa_model/bin_inputs": tf.tensor(binInputs, [batches, inputBufferLength, inputBufferChannels], 'float32'),
+            "swa_model/global_inputs": tf.tensor(globalInputs, [batches, inputGlobalBufferChannels], 'float32')
+        });
+        const policyTensor = level ? results[1]: results[3];
+        const policyArray = await policyTensor.slice([0, 0, 0], [1, 1, 361]).array();
+        const flatPolicyArray = policyArray[0][0];
+        let scores = level ? results[2] : results[1];
+        let flatScores = scores.dataSync();
+        let copyPolicy = JSON.parse(JSON.stringify(flatPolicyArray));
+        let topPolicies = copyPolicy.sort((a, b) => b - a);
+     
+        for (let i = 0; i < topPolicies.length; i++) {
+          let policyMove = flatPolicyArray.indexOf(topPolicies[i]);
+          if (move == policyMove) return i+1;
+        }
+      } catch (e) {console.log(e);}
+    }
+  </script>
+</body>
+</html>

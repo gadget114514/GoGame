@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="description" content="3D Go game with KataGo AI, chess-piece stones and score-colored board." />
+    <title>GoGame 3D</title>
+    <link rel="icon" href="./icons/icon-192.png" />
+  </head>
+  <body>
+    <div id="app">
+      <header id="toolbar">
+        <div class="group">
+          <label>Board
+            <select id="board-size">
+              <option value="9">9 &times; 9</option>
+              <option value="13">13 &times; 13</option>
+              <option value="19" selected>19 &times; 19</option>
+            </select>
+          </label>
+          <label>AI
+            <select id="ai-level">
+              <option value="dan" selected>Dan</option>
+              <option value="kyu">Kyu</option>
+            </select>
+          </label>
+          <label>Komi
+            <input id="komi" type="number" step="0.5" min="0" max="20" value="7.5" />
+          </label>
+        </div>
+        <div class="group">
+          <button id="btn-new" title="New game">New</button>
+          <button id="btn-pass" title="Pass">Pass</button>
+          <button id="btn-undo" title="Undo">Undo</button>
+          <button id="btn-eval" title="Evaluate position">Eval</button>
+          <button id="btn-view" title="Toggle 2D / 3D">2D</button>
+          <button id="btn-save" title="Save SGF">Save</button>
+          <button id="btn-load" title="Load SGF">Load</button>
+          <input id="file-sgf" type="file" accept=".sgf,text/plain" hidden />
+        </div>
+      </header>
+
+      <main id="stage">
+        <canvas id="scene3d" touch-action="none"></canvas>
+        <canvas id="scene2d" hidden></canvas>
+        <div id="thinking" class="overlay" hidden><span class="spinner"></span> Thinking…</div>
+        <div id="boot" class="overlay">Loading KataGo model…</div>
+      </main>
+
+      <footer id="status">
+        <span id="turn">Black to play</span>
+        <span id="score"></span>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

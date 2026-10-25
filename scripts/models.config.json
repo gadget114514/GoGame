@@ -1,0 +1,28 @@
+{
+  "sources": [
+    {
+      "level": "dan",
+      "size": 19,
+      "url": "https://maksimkorzh.github.io/go/model/dan/model.json",
+      "note": "KataGo b10c128 (dan) converted to TensorFlow.js"
+    },
+    {
+      "level": "kyu",
+      "size": 19,
+      "url": "https://maksimkorzh.github.io/go/model/kyu/model.json",
+      "note": "KataGo b6c96 (kyu) converted to TensorFlow.js"
+    }
+  ],
+  "rawNetworks": [
+    {
+      "size": 9,
+      "url": "https://github.com/lightvector/KataGo/releases/download/v1.13.2-kata9x9/kata9x9-b18c384nbt-20231025.bin.gz",
+      "note": "9x9 fine-tuned net. Convert to TF.js with a fixed 9x9 graph, then place in public/models/{dan,kyu}-9x9/."
+    },
+    {
+      "size": 13,
+      "url": "https://media.katagotraining.org/uploaded/networks/zips/kata1/kata1-b6c96-s175395328-d26788732.zip",
+      "note": "Main-run net for 13x13. Convert to TF.js with a fixed 13x13 graph."
+    }
+  ]
+}
