@@ -1,15 +1,19 @@
 import { Goban, BLACK, WHITE } from '../game/Goban';
-import { DEFAULT_KOMI, isBoardSize, type BoardSize } from '../game/BoardSize';
+import { DEFAULT_KOMI, formatCoordinate, isBoardSize, type BoardSize } from '../game/BoardSize';
 import { KataGoEngine, type Evaluation } from '../ai/KataGoEngine';
 import type { AILevel } from '../ai/registry';
-import { Board3D, type RenderState } from './Board3D';
+import { Board3D, type PieceStyle, type RenderState } from './Board3D';
 import { Board2D } from './Board2D';
+import { detectInitialLanguage, setLanguage, t, type Language } from '../i18n';
 
 interface Elements {
   canvas3d: HTMLCanvasElement;
   canvas2d: HTMLCanvasElement;
   boardSize: HTMLSelectElement;
   aiLevel: HTMLSelectElement;
+  pieceStyle: HTMLSelectElement;
+  languageSelect: HTMLSelectElement;
+  toggleHoverEval: HTMLInputElement;
   komi: HTMLInputElement;
   newGame: HTMLButtonElement;
   pass: HTMLButtonElement;
@@ -47,12 +51,21 @@ export class GameController {
   private gameOver = false;
   private evaluationToken = 0;
 
+  private hoverEvalEnabled = true;
+  private hoverIndex: number | null = null;
+  private hoverEvaluation: Evaluation | null = null;
+  private hoverToken = 0;
+  private hoverCache = new Map<string, Evaluation>();
+
   constructor() {
     this.els = {
       canvas3d: requireElement('scene3d'),
       canvas2d: requireElement('scene2d'),
       boardSize: requireElement('board-size'),
       aiLevel: requireElement('ai-level'),
+      pieceStyle: requireElement('piece-style'),
+      languageSelect: requireElement('language-select'),
+      toggleHoverEval: requireElement('toggle-hover-eval'),
       komi: requireElement('komi'),
       newGame: requireElement('btn-new'),
       pass: requireElement('btn-pass'),
@@ -74,17 +87,37 @@ export class GameController {
 
     this.level = this.els.aiLevel.value === 'kyu' ? 'kyu' : 'dan';
 
+    const savedStyle = (localStorage.getItem('gogame:pieceStyle') as PieceStyle) || 'clayfoot';
+    this.els.pieceStyle.value = savedStyle;
+
+    this.hoverEvalEnabled = localStorage.getItem('gogame:hoverEval') !== 'false';
+    this.els.toggleHoverEval.checked = this.hoverEvalEnabled;
+
+    const initialLang = detectInitialLanguage();
+    setLanguage(initialLang);
+    this.els.languageSelect.value = initialLang;
+
     this.board3d = new Board3D(this.els.canvas3d);
     this.board2d = new Board2D(this.els.canvas2d);
     this.board3d.setBoardSize(size);
+    void this.board3d.setPieceStyle(savedStyle);
     this.board2d.resize();
 
     this.board3d.setOnIntersectionClick((index) => void this.humanPlay(index));
     this.board2d.setOnIntersectionClick((index) => void this.humanPlay(index));
 
+    this.board3d.setOnIntersectionHover((index) => this.onHoverIntersection(index));
+    this.board2d.setOnIntersectionHover((index) => this.onHoverIntersection(index));
+
     this.wireControls();
+    this.applyLanguage();
     this.render();
     this.updateStatus();
+
+    const legend = document.getElementById('rank-legend');
+    if (legend && savedStyle === 'stones') {
+      legend.style.display = 'none';
+    }
   }
 
   async start(): Promise<void> {
@@ -93,7 +126,7 @@ export class GameController {
       await this.refreshEvaluation(true);
     } catch (error) {
       console.error('KataGo initialization failed', error);
-      this.els.turn.textContent = 'AI unavailable — check console';
+      this.els.turn.textContent = t('aiUnavailable');
     } finally {
       this.els.boot.hidden = true;
     }
@@ -107,12 +140,35 @@ export class GameController {
     this.els.view.addEventListener('click', () => this.toggleView());
 
     this.els.boardSize.addEventListener('change', () => this.changeBoardSize());
+    this.els.pieceStyle.addEventListener('change', () => {
+      const style = (this.els.pieceStyle.value as PieceStyle) || 'clayfoot';
+      localStorage.setItem('gogame:pieceStyle', style);
+      void this.board3d.setPieceStyle(style);
+      const legend = document.getElementById('rank-legend');
+      if (legend) {
+        legend.style.display = style === 'stones' ? 'none' : '';
+      }
+    });
+    this.els.languageSelect.addEventListener('change', () => {
+      const lang = this.els.languageSelect.value as Language;
+      setLanguage(lang);
+      this.applyLanguage();
+    });
+    this.els.toggleHoverEval.addEventListener('change', () => {
+      this.hoverEvalEnabled = this.els.toggleHoverEval.checked;
+      localStorage.setItem('gogame:hoverEval', String(this.hoverEvalEnabled));
+      if (!this.hoverEvalEnabled && this.hoverIndex !== null) {
+        this.clearHover();
+      }
+    });
     this.els.aiLevel.addEventListener('change', () => {
       this.level = this.els.aiLevel.value === 'kyu' ? 'kyu' : 'dan';
+      this.hoverCache.clear();
       void this.refreshEvaluation(true);
     });
     this.els.komi.addEventListener('change', () => {
       this.goban.komi = this.readKomi(this.goban.size);
+      this.hoverCache.clear();
       this.updateStatus();
       void this.refreshEvaluation(true);
     });
@@ -120,6 +176,23 @@ export class GameController {
     this.els.save.addEventListener('click', () => this.saveSGF());
     this.els.load.addEventListener('click', () => this.els.file.click());
     this.els.file.addEventListener('change', () => void this.loadSGF());
+  }
+
+  private applyLanguage(): void {
+    document.querySelectorAll<HTMLElement>('[data-i18n]').forEach((el) => {
+      const key = el.getAttribute('data-i18n') as any;
+      if (key) el.textContent = t(key);
+    });
+    document.querySelectorAll<HTMLElement>('[data-i18n-title]').forEach((el) => {
+      const key = el.getAttribute('data-i18n-title') as any;
+      if (key) el.title = t(key);
+    });
+    this.updateViewButtonText();
+    this.updateStatus();
+  }
+
+  private updateViewButtonText(): void {
+    this.els.view.textContent = this.view === '3d' ? t('toggleView2D') : t('toggleView3D');
   }
 
   private readBoardSize(): BoardSize {
@@ -134,6 +207,8 @@ export class GameController {
   }
 
   private startNewGame(): void {
+    this.clearHover();
+    this.hoverCache.clear();
     const size = this.readBoardSize();
     this.goban = new Goban(size, this.readKomi(size));
     this.evaluation = null;
@@ -146,6 +221,8 @@ export class GameController {
   }
 
   private changeBoardSize(): void {
+    this.clearHover();
+    this.hoverCache.clear();
     const size = this.readBoardSize();
     const komi = DEFAULT_KOMI[size];
     this.els.komi.value = String(komi);
@@ -164,7 +241,7 @@ export class GameController {
     const show3d = this.view === '3d';
     this.els.canvas3d.hidden = !show3d;
     this.els.canvas2d.hidden = show3d;
-    this.els.view.textContent = show3d ? '2D' : '3D';
+    this.updateViewButtonText();
     if (show3d) this.board3d.resize();
     else {
       this.board2d.resize();
@@ -176,6 +253,9 @@ export class GameController {
     if (this.busy || this.gameOver) return;
     if (this.goban.side !== BLACK) return;
     if (!this.goban.play(index)) return;
+
+    this.clearHover();
+    this.hoverCache.clear();
 
     const record = this.goban.moves[this.goban.moves.length - 1];
     record.weight = 0.35;
@@ -189,6 +269,9 @@ export class GameController {
   private async humanPass(): Promise<void> {
     if (this.busy || this.gameOver) return;
     if (this.goban.side !== BLACK) return;
+
+    this.clearHover();
+    this.hoverCache.clear();
 
     this.goban.pass();
     const record = this.goban.moves[this.goban.moves.length - 1];
@@ -204,6 +287,8 @@ export class GameController {
     if (this.busy || this.gameOver) return;
     this.busy = true;
     this.setThinking(true);
+    this.clearHover();
+    this.hoverCache.clear();
 
     try {
       const { move, evaluation } = await this.engine.chooseMove(this.goban, this.level);
@@ -226,7 +311,7 @@ export class GameController {
       this.checkGameOver();
     } catch (error) {
       console.error('AI move failed', error);
-      this.els.turn.textContent = 'AI error — check console';
+      this.els.turn.textContent = t('aiError');
     } finally {
       this.busy = false;
       this.setThinking(false);
@@ -235,6 +320,8 @@ export class GameController {
 
   private async undo(): Promise<void> {
     if (this.busy) return;
+    this.clearHover();
+    this.hoverCache.clear();
     let undone = 0;
     while (undone < 2 && this.goban.undo()) {
       undone++;
@@ -264,6 +351,55 @@ export class GameController {
     }
   }
 
+  private onHoverIntersection(index: number | null): void {
+    if (!this.hoverEvalEnabled || this.busy || this.gameOver) {
+      if (this.hoverIndex !== null) this.clearHover();
+      return;
+    }
+
+    if (index === null || this.goban.at(index) !== 0 || !this.goban.legal(index)) {
+      if (this.hoverIndex !== null) this.clearHover();
+      return;
+    }
+
+    if (index === this.hoverIndex) return;
+    this.hoverIndex = index;
+
+    const cacheKey = `${this.goban.moves.length}:${this.goban.side}:${index}:${this.level}`;
+    const cached = this.hoverCache.get(cacheKey);
+    if (cached) {
+      this.hoverEvaluation = cached;
+      this.render();
+      this.updateStatus();
+      return;
+    }
+
+    const token = ++this.hoverToken;
+    window.setTimeout(async () => {
+      if (token !== this.hoverToken || this.hoverIndex !== index || !this.hoverEvalEnabled) return;
+      try {
+        const hypothetical = this.goban.clone();
+        if (!hypothetical.play(index)) return;
+        const evaluation = await this.engine.evaluate(hypothetical, this.level);
+        if (token !== this.hoverToken || this.hoverIndex !== index || !this.hoverEvalEnabled) return;
+        this.hoverCache.set(cacheKey, evaluation);
+        this.hoverEvaluation = evaluation;
+        this.render();
+        this.updateStatus();
+      } catch (err) {
+        console.debug('Hover evaluation skipped', err);
+      }
+    }, 60);
+  }
+
+  private clearHover(): void {
+    if (this.hoverIndex === null && this.hoverEvaluation === null) return;
+    this.hoverIndex = null;
+    this.hoverEvaluation = null;
+    this.render();
+    this.updateStatus();
+  }
+
   private moveWeights(): Map<number, number> {
     const weights = new Map<number, number>();
     for (const record of this.goban.moves) {
@@ -273,42 +409,59 @@ export class GameController {
   }
 
   private render(): void {
+    const activeEval = this.hoverEvaluation ?? this.evaluation;
     const state: RenderState = {
       goban: this.goban,
-      evaluation: this.evaluation,
+      evaluation: activeEval,
       moveWeights: this.moveWeights()
     };
     this.board3d.update(state);
-    this.board2d.update(this.goban, this.evaluation);
+    this.board2d.update(this.goban, activeEval);
   }
 
   private updateStatus(): void {
+    let lastInfo = '';
+    if (this.goban.moves.length > 0) {
+      const lastRecord = this.goban.moves[this.goban.moves.length - 1];
+      const lastColor = lastRecord.color === BLACK ? t('black') : t('white');
+      const coord =
+        lastRecord.move !== null
+          ? formatCoordinate(lastRecord.move, this.goban.size)
+          : t('passMove');
+      lastInfo = ` · ${t('lastMove', { color: lastColor, coord })}`;
+    }
+
     if (this.gameOver) {
       const result = this.goban.score();
       const winner =
-        result.winner === BLACK ? 'Black' : result.winner === WHITE ? 'White' : 'Draw';
-      const margin = result.winner === 0 ? '' : ` by ${result.margin.toFixed(1)}`;
-      this.els.turn.textContent = `Game over — ${winner}${margin}`;
+        result.winner === BLACK ? t('black') : result.winner === WHITE ? t('white') : t('draw');
+      const margin = result.winner === 0 ? '' : t('byMargin', { margin: result.margin.toFixed(1) });
+      this.els.turn.textContent = `${t('gameOver', { winner, margin })}${lastInfo}`;
       this.els.score.textContent = `B ${result.black.toFixed(1)} : ${result.white.toFixed(1)} W (komi ${result.komi})`;
       return;
     }
 
-    const side = this.goban.side === BLACK ? 'Black' : 'White';
+    const side = this.goban.side === BLACK ? t('black') : t('white');
     this.els.turn.textContent =
       this.goban.moves.length === 0
-        ? 'Black to play'
-        : `${side} to play · move ${this.goban.moves.length + 1}`;
+        ? t('blackToPlay')
+        : `${t('turnToPlay', { side, move: this.goban.moves.length + 1 })}${lastInfo}`;
 
-    if (this.evaluation) {
-      const lead = this.evaluation.scoreLead;
+    const activeEval = this.hoverEvaluation ?? this.evaluation;
+    if (activeEval) {
+      const lead = activeEval.scoreLead;
       const label =
         Math.abs(lead) < 0.05
-          ? 'Even'
+          ? t('even')
           : `${lead > 0 ? 'B' : 'W'} +${Math.abs(lead).toFixed(1)}`;
-      const win = this.evaluation.winrate;
+      const win = activeEval.winrate;
       const winLabel = `${(win * 100).toFixed(0)}% B`;
-      const padded = this.evaluation.padded ? ' · padded 19x19 net' : '';
-      this.els.score.textContent = `${label} · ${winLabel}${padded}`;
+      const padded = activeEval.padded ? ` · ${t('paddedNet')}` : '';
+      const isHover = this.hoverEvaluation !== null && this.hoverIndex !== null;
+      const hoverPrefix = isHover
+        ? `[${t('preview')} ${formatCoordinate(this.hoverIndex, this.goban.size)}] `
+        : '';
+      this.els.score.textContent = `${hoverPrefix}${label} · ${winLabel}${padded}`;
     } else {
       this.els.score.textContent = '';
     }
@@ -340,6 +493,8 @@ export class GameController {
   private async loadSGF(): Promise<void> {
     const file = this.els.file.files?.[0];
     if (!file) return;
+    this.clearHover();
+    this.hoverCache.clear();
     try {
       const text = await file.text();
       const sizeMatch = text.match(/SZ\[(\d+)\]/);
@@ -366,7 +521,7 @@ export class GameController {
       if (!this.gameOver && this.goban.side === WHITE) await this.aiTurn();
     } catch (error) {
       console.error('Failed to load SGF', error);
-      this.els.turn.textContent = 'Invalid SGF file';
+      this.els.turn.textContent = t('invalidSgf');
     } finally {
       this.els.file.value = '';
     }

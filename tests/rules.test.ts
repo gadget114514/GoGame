@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BLACK, EMPTY, Goban, WHITE } from '../src/game/Goban';
+import { formatCoordinate } from '../src/game/BoardSize';
 
 const at = (size: number, row: number, col: number) => row * size + col;
 
@@ -78,5 +79,33 @@ describe('Goban rules', () => {
     expect(loaded.board[at(9, 2, 2)]).toBe(BLACK);
     expect(loaded.board[at(9, 6, 6)]).toBe(WHITE);
     expect(loaded.moves.length).toBe(3);
+  });
+
+  it('formats Go coordinates accurately skipping I', () => {
+    // 19x19 corners and tengen
+    expect(formatCoordinate(0, 19)).toBe('A19');
+    expect(formatCoordinate(18 * 19, 19)).toBe('A1');
+    expect(formatCoordinate(18, 19)).toBe('T19');
+    expect(formatCoordinate(18 * 19 + 18, 19)).toBe('T1');
+    // Tengen (row 9, col 9) -> col index 9 is K (since I is skipped: A,B,C,D,E,F,G,H,J,K), row 19-9=10
+    expect(formatCoordinate(9 * 19 + 9, 19)).toBe('K10');
+    // D4: col 3, row 15 (19 - 15 = 4)
+    expect(formatCoordinate(15 * 19 + 3, 19)).toBe('D4');
+    // Pass and invalid coordinates
+    expect(formatCoordinate(null, 19)).toBe('Pass');
+    expect(formatCoordinate(-1, 19)).toBe('Pass');
+  });
+
+  it('clones game state independently', () => {
+    const goban = new Goban(9, 7);
+    goban.play(at(9, 2, 2));
+    const clone = goban.clone();
+    expect(clone.board[at(9, 2, 2)]).toBe(BLACK);
+    expect(clone.side).toBe(WHITE);
+    expect(clone.moves.length).toBe(1);
+
+    clone.play(at(9, 3, 3));
+    expect(clone.board[at(9, 3, 3)]).toBe(WHITE);
+    expect(goban.board[at(9, 3, 3)]).toBe(EMPTY);
   });
 });

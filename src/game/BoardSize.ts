@@ -38,3 +38,19 @@ export function neighbors(index: number, size: number): number[] {
   if (col < size - 1) result.push(index + 1);
   return result;
 }
+
+export const COORD_LETTERS = 'ABCDEFGHJKLMNOPQRST';
+
+/**
+ * Formats a 0-indexed board intersection to standard Go coordinate notation (e.g. "Q16", "D4").
+ * Standard Go skips the letter 'I'. Row numbering counts from bottom (1) to top (size).
+ */
+export function formatCoordinate(index: number | null, size: number): string {
+  if (index === null || index < 0 || index >= size * size) return 'Pass';
+  const col = index % size;
+  const row = Math.floor(index / size);
+  const colLetter = COORD_LETTERS[col] ?? '?';
+  const rowNumber = size - row;
+  return `${colLetter}${rowNumber}`;
+}
+

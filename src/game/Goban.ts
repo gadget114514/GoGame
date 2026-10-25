@@ -64,6 +64,16 @@ export class Goban {
     this.board = new Uint8Array(this.area);
   }
 
+  clone(): Goban {
+    const copy = new Goban(this.size, this.komi);
+    copy.board = new Uint8Array(this.board);
+    copy.side = this.side;
+    copy.ko = this.ko;
+    copy.lastMove = this.lastMove;
+    copy.moves = this.moves.map((m) => ({ ...m }));
+    return copy;
+  }
+
   at(index: number): number {
     return this.board[index] ?? EMPTY;
   }

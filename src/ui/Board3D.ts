@@ -9,6 +9,7 @@ import {
   HemisphericLight,
   Mesh,
   MeshBuilder,
+  ParticleSystem,
   Scene,
   SceneLoader,
   StandardMaterial,
@@ -19,10 +20,12 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { BLACK, WHITE, type Goban } from '../game/Goban';
-import { starPoints, type BoardSize } from '../game/BoardSize';
+import { starPoints, COORD_LETTERS, type BoardSize } from '../game/BoardSize';
 import type { Evaluation } from '../ai/KataGoEngine';
 import { heatColor } from './heatmap';
 import { pieceRank } from './pieceRank';
+
+export type PieceStyle = 'clayfoot' | 'dark-yagami' | 'stones';
 
 export interface RenderState {
   goban: Goban;
@@ -42,6 +45,8 @@ type PieceFile = (typeof PIECE_FILES)[number];
 
 const SPACING = 1;
 const TEXTURE_SIZE = 1024;
+const BLACK_MOVE_COLOR = new Color3(1.0, 0.58, 0.12);
+const WHITE_MOVE_COLOR = new Color3(0.12, 0.78, 1.0);
 
 export class Board3D {
   private engine: Engine;
@@ -57,11 +62,29 @@ export class Board3D {
   private boardMesh: Mesh | null = null;
   private heatPlane: Mesh | null = null;
   private heatTexture: DynamicTexture | null = null;
+  private coordPlane: Mesh | null = null;
+  private coordTexture: DynamicTexture | null = null;
 
-  private containers = new Map<PieceFile, AssetContainer>();
+  private currentStyle: PieceStyle = 'clayfoot';
+  private styleContainers = new Map<PieceStyle, Map<PieceFile, AssetContainer>>();
+  private styleScales = new Map<PieceStyle, number>();
   private pieces = new Map<number, PieceHandle>();
   private fallback = false;
+  private lastState: RenderState | null = null;
 
+  private particleTexture: DynamicTexture;
+  private lastMoveMaterial: StandardMaterial;
+  private lastMoveGlowMaterial: StandardMaterial;
+  private lastMoveRing: Mesh;
+  private lastMoveGlow: Mesh;
+  private lastMoveBeacon: Mesh;
+  private lastMovePillar: Mesh;
+  private lastMoveNumber = -1;
+  private lastMovePulseAt = 0;
+  private effectSeed = 0;
+
+  private hoverMarker: Mesh;
+  private hoverHandler: ((index: number | null) => void) | null = null;
   private size: BoardSize = 19;
   private clickHandler: ((index: number) => void) | null = null;
 
@@ -119,35 +142,176 @@ export class Board3D {
     this.whiteMaterial.specularPower = 56;
     this.whiteMaterial.emissiveColor = new Color3(0.05, 0.048, 0.045);
 
+    this.particleTexture = new DynamicTexture(
+      'particle-texture',
+      { width: 64, height: 64 },
+      this.scene,
+      false
+    );
+    const particleContext = this.particleTexture.getContext();
+    const particleGradient = particleContext.createRadialGradient(32, 32, 0, 32, 32, 32);
+    particleGradient.addColorStop(0, 'rgba(255,255,255,1)');
+    particleGradient.addColorStop(0.35, 'rgba(255,255,255,0.9)');
+    particleGradient.addColorStop(1, 'rgba(255,255,255,0)');
+    particleContext.fillStyle = particleGradient;
+    particleContext.fillRect(0, 0, 64, 64);
+    this.particleTexture.hasAlpha = true;
+    this.particleTexture.update(false);
+
+    this.lastMoveMaterial = new StandardMaterial('last-move-material', this.scene);
+    this.lastMoveMaterial.diffuseColor = Color3.Black();
+    this.lastMoveMaterial.emissiveColor = BLACK_MOVE_COLOR;
+    this.lastMoveMaterial.specularColor = Color3.Black();
+    this.lastMoveMaterial.disableLighting = true;
+    this.lastMoveMaterial.alpha = 0.9;
+    this.lastMoveMaterial.backFaceCulling = false;
+
+    this.lastMoveGlowMaterial = new StandardMaterial('last-move-glow-material', this.scene);
+    this.lastMoveGlowMaterial.diffuseColor = Color3.Black();
+    this.lastMoveGlowMaterial.emissiveColor = BLACK_MOVE_COLOR;
+    this.lastMoveGlowMaterial.specularColor = Color3.Black();
+    this.lastMoveGlowMaterial.disableLighting = true;
+    this.lastMoveGlowMaterial.alpha = 0.18;
+    this.lastMoveGlowMaterial.backFaceCulling = false;
+
+    const ring = MeshBuilder.CreateTorus(
+      'last-move-ring',
+      { diameter: 1.02, thickness: 0.058, tessellation: 48 },
+      this.scene
+    );
+    ring.material = this.lastMoveMaterial;
+    ring.isPickable = false;
+    ring.isVisible = false;
+    this.lastMoveRing = ring;
+
+    const glow = MeshBuilder.CreateDisc(
+      'last-move-glow',
+      { radius: 0.58, tessellation: 48 },
+      this.scene
+    );
+    glow.rotation.x = -Math.PI / 2;
+    glow.material = this.lastMoveGlowMaterial;
+    glow.isPickable = false;
+    glow.isVisible = false;
+    this.lastMoveGlow = glow;
+
+    const beacon = MeshBuilder.CreatePolyhedron(
+      'last-move-beacon',
+      { type: 1, size: 0.18 },
+      this.scene
+    );
+    beacon.material = this.lastMoveMaterial;
+    beacon.isPickable = false;
+    beacon.isVisible = false;
+    this.lastMoveBeacon = beacon;
+
+    const pillar = MeshBuilder.CreateCylinder(
+      'last-move-pillar',
+      { height: 1.40, diameter: 0.05, tessellation: 12 },
+      this.scene
+    );
+    pillar.material = this.lastMoveGlowMaterial;
+    pillar.isPickable = false;
+    pillar.isVisible = false;
+    this.lastMovePillar = pillar;
+
+    const hoverMat = new StandardMaterial('hover-preview-mat', this.scene);
+    hoverMat.diffuseColor = Color3.Black();
+    hoverMat.emissiveColor = new Color3(1.0, 0.82, 0.25);
+    hoverMat.disableLighting = true;
+    hoverMat.alpha = 0.5;
+    hoverMat.backFaceCulling = false;
+
+    const hoverRing = MeshBuilder.CreateTorus(
+      'hover-preview-ring',
+      { diameter: 0.92, thickness: 0.045, tessellation: 36 },
+      this.scene
+    );
+    hoverRing.material = hoverMat;
+    hoverRing.isPickable = false;
+    hoverRing.isVisible = false;
+    this.hoverMarker = hoverRing;
+
+    this.scene.onBeforeRenderObservable.add(() => this.animateLastMoveMarker());
+
     this.attachPointer();
     window.addEventListener('resize', this.resize);
     this.engine.runRenderLoop(() => this.scene.render());
 
-    void this.loadPieces();
+    void this.setPieceStyle('clayfoot');
   }
 
-  private async loadPieces(): Promise<void> {
-    const base = import.meta.env.BASE_URL || './';
-    const root = `${base.endsWith('/') ? base : `${base}/`}assets/chess/`;
-    try {
-      for (const file of PIECE_FILES) {
-        const container = await SceneLoader.LoadAssetContainerAsync(
-          root,
-          `${file}.glb`,
-          this.scene
-        );
-        this.containers.set(file, container);
-      }
-    } catch (error) {
-      console.warn('Chess GLB assets unavailable, using primitive stones.', error);
-      this.fallback = true;
-      this.containers.clear();
+  async setPieceStyle(style: PieceStyle): Promise<void> {
+    if (this.currentStyle === style && this.ready && (style === 'stones' || this.styleContainers.has(style))) {
+      return;
+    }
+    this.currentStyle = style;
+    if (style !== 'stones') {
+      await this.ensureStyleLoaded(style);
     }
     this.ready = true;
+    this.pieces.forEach((piece) => piece.root.dispose());
+    this.pieces.clear();
+    if (this.lastState) {
+      this.syncPieces(this.lastState);
+    }
+  }
+
+  private async ensureStyleLoaded(style: PieceStyle): Promise<void> {
+    if (this.styleContainers.has(style) || style === 'stones') return;
+    const base = import.meta.env.BASE_URL || './';
+    const baseUrl = base.endsWith('/') ? base : `${base}/`;
+    const folder = style === 'clayfoot' ? 'assets/chess/clayfoot/' : 'assets/chess/dark-yagami/';
+    const root = `${baseUrl}${folder}`;
+    const fallbackRoot = `${baseUrl}assets/chess/`;
+
+    const containers = new Map<PieceFile, AssetContainer>();
+    try {
+      for (const file of PIECE_FILES) {
+        let container: AssetContainer;
+        try {
+          container = await SceneLoader.LoadAssetContainerAsync(
+            root,
+            `${file}.glb`,
+            this.scene
+          );
+        } catch {
+          container = await SceneLoader.LoadAssetContainerAsync(
+            fallbackRoot,
+            `${file}.glb`,
+            this.scene
+          );
+        }
+        containers.set(file, container);
+      }
+
+      // Compute uniform scale so Queen is ~1.05 high
+      const queenContainer = containers.get('queen');
+      let setScale = 1.0;
+      if (queenContainer) {
+        const qEntries = queenContainer.instantiateModelsToScene(undefined, false);
+        const qRoot = qEntries.rootNodes[0] as TransformNode;
+        const { min, max } = qRoot.getHierarchyBoundingVectors(true);
+        const qHeight = max.y - min.y;
+        if (qHeight > 0) {
+          setScale = 1.05 / qHeight;
+        }
+        qEntries.rootNodes.forEach((n) => n.dispose());
+      }
+      this.styleScales.set(style, setScale);
+      this.styleContainers.set(style, containers);
+    } catch (error) {
+      console.warn(`Failed loading piece style [${style}], using fallback.`, error);
+      this.fallback = true;
+    }
   }
 
   setOnIntersectionClick(handler: (index: number) => void): void {
     this.clickHandler = handler;
+  }
+
+  setOnIntersectionHover(handler: (index: number | null) => void): void {
+    this.hoverHandler = handler;
   }
 
   get pieceCount(): number {
@@ -161,6 +325,8 @@ export class Board3D {
     this.boardMesh = null;
     this.heatPlane = null;
     this.heatTexture = null;
+    this.coordPlane = null;
+    this.coordTexture = null;
     this.pieces.forEach((piece) => piece.root.dispose());
     this.pieces.clear();
     this.buildBoard();
@@ -244,13 +410,49 @@ export class Board3D {
     this.boardNodes.push(plane);
     this.heatPlane = plane;
 
-    this.camera.radius = Math.max(13, n * 1.65);
+    // Coordinate border overlay
+    const coordPlaneSize = planeWidth + 0.88;
+    const coordTexture = new DynamicTexture(
+      'board-coords',
+      { width: TEXTURE_SIZE, height: TEXTURE_SIZE },
+      this.scene,
+      false
+    );
+    coordTexture.hasAlpha = true;
+    this.coordTexture = coordTexture;
+
+    const coordMaterial = new StandardMaterial('coord-material', this.scene);
+    coordMaterial.diffuseTexture = coordTexture;
+    coordMaterial.emissiveTexture = coordTexture;
+    coordMaterial.useAlphaFromDiffuseTexture = true;
+    coordMaterial.diffuseColor = new Color3(1, 1, 1);
+    coordMaterial.emissiveColor = new Color3(0.65, 0.55, 0.45);
+    coordMaterial.specularColor = Color3.Black();
+    coordMaterial.disableLighting = true;
+    coordMaterial.backFaceCulling = false;
+
+    const coordPlane = MeshBuilder.CreatePlane(
+      'coord-plane',
+      { width: coordPlaneSize, height: coordPlaneSize, sideOrientation: Mesh.DOUBLESIDE },
+      this.scene
+    );
+    coordPlane.rotation.x = -Math.PI / 2;
+    coordPlane.position.y = 0.016;
+    coordPlane.material = coordMaterial;
+    coordPlane.isPickable = false;
+    this.boardNodes.push(coordPlane);
+    this.coordPlane = coordPlane;
+
+    this.drawCoordinates(null);
+
+    this.camera.radius = Math.max(14, n * 1.75);
     this.camera.lowerRadiusLimit = Math.max(8, n * 0.75);
     this.camera.upperRadiusLimit = Math.max(24, n * 4);
     this.camera.setTarget(Vector3.Zero());
   }
 
   update(state: RenderState): void {
+    this.lastState = state;
     if (!this.ready) return;
     if (state.goban.size !== this.size) this.setBoardSize(state.goban.size);
     this.updateHeat(state);
@@ -286,6 +488,9 @@ export class Board3D {
   private syncPieces(state: RenderState): void {
     const { goban } = state;
     const n = goban.size;
+    const moveDelta = this.lastMoveNumber < 0 ? 0 : goban.moveNumber - this.lastMoveNumber;
+    const isNewMove = moveDelta === 1;
+
     for (let index = 0; index < n * n; index++) {
       const color = goban.board[index];
       const existing = this.pieces.get(index);
@@ -307,15 +512,134 @@ export class Board3D {
           this.pieces.set(index, { root, rank, color, dead });
         }
       } else if (existing) {
-        existing.root.dispose();
+        if (isNewMove) this.explodePiece(existing);
+        else existing.root.dispose();
         this.pieces.delete(index);
       }
     }
+
+    this.updateLastMoveMarker(state, isNewMove);
+    this.lastMoveNumber = goban.moveNumber;
   }
 
   private rankFor(index: number, color: number, state: RenderState): { rank: number; dead: boolean } {
     const ownership = state.evaluation?.ownership[index] ?? 0;
     return pieceRank(ownership, color, index === state.goban.lastMove);
+  }
+
+  private updateLastMoveMarker(state: RenderState, isNewMove: boolean): void {
+    const last = state.goban.lastMove;
+    this.drawCoordinates(last);
+
+    if (last === null) {
+      this.lastMoveRing.isVisible = false;
+      this.lastMoveGlow.isVisible = false;
+      this.lastMoveBeacon.isVisible = false;
+      this.lastMovePillar.isVisible = false;
+      return;
+    }
+
+    const n = state.goban.size;
+    const row = Math.floor(last / n);
+    const col = last % n;
+    const x = this.worldCoordinate(col);
+    const z = this.worldCoordinate(row);
+    const color = state.goban.board[last] === WHITE ? WHITE_MOVE_COLOR : BLACK_MOVE_COLOR;
+
+    this.lastMoveMaterial.emissiveColor.copyFrom(color);
+    this.lastMoveGlowMaterial.emissiveColor.copyFrom(color);
+    this.lastMoveRing.position.set(x, 0.05, z);
+    this.lastMoveGlow.position.set(x, 0.035, z);
+    this.lastMoveRing.isVisible = true;
+    this.lastMoveGlow.isVisible = true;
+
+    const beaconBaseY = 1.48;
+    this.lastMoveBeacon.position.set(x, beaconBaseY, z);
+    this.lastMoveBeacon.isVisible = true;
+
+    this.lastMovePillar.position.set(x, beaconBaseY / 2, z);
+    this.lastMovePillar.isVisible = true;
+
+    if (isNewMove) {
+      this.lastMovePulseAt = performance.now();
+      this.spawnBurst(new Vector3(x, 0.18, z), color, 72, 3.4);
+    }
+  }
+
+  private drawCoordinates(lastMove: number | null): void {
+    const texture = this.coordTexture;
+    if (!texture) return;
+    const ctx = texture.getContext() as unknown as CanvasRenderingContext2D;
+    const size = TEXTURE_SIZE;
+    ctx.clearRect(0, 0, size, size);
+
+    const n = this.size;
+    const span = (n - 1) * SPACING;
+    const coordPlaneSize = n * SPACING + 0.88;
+    const gridExtent = (span / coordPlaneSize) * size;
+    const center = size / 2;
+
+    const lastCol = lastMove !== null ? lastMove % n : -1;
+    const lastRow = lastMove !== null ? Math.floor(lastMove / n) : -1;
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const pad = Math.max(16, (size - gridExtent) / 3.4);
+
+    for (let i = 0; i < n; i++) {
+      const frac = n > 1 ? i / (n - 1) - 0.5 : 0;
+      const pos = center + frac * gridExtent;
+
+      // Column letters (top and bottom)
+      const letter = COORD_LETTERS[i] ?? '';
+      const isColActive = i === lastCol;
+      ctx.fillStyle = isColActive ? '#f59e0b' : 'rgba(55, 36, 18, 0.85)';
+      ctx.font = isColActive
+        ? `bold ${Math.max(15, Math.round(26 * (19 / n)))}px "Segoe UI", system-ui, sans-serif`
+        : `600 ${Math.max(13, Math.round(22 * (19 / n)))}px "Segoe UI", system-ui, sans-serif`;
+
+      ctx.fillText(letter, pos, center - gridExtent / 2 - pad);
+      ctx.fillText(letter, pos, center + gridExtent / 2 + pad);
+
+      // Row numbers (left and right)
+      const numStr = String(n - i);
+      const isRowActive = i === lastRow;
+      ctx.fillStyle = isRowActive ? '#f59e0b' : 'rgba(55, 36, 18, 0.85)';
+      ctx.font = isRowActive
+        ? `bold ${Math.max(15, Math.round(26 * (19 / n)))}px "Segoe UI", system-ui, sans-serif`
+        : `600 ${Math.max(13, Math.round(22 * (19 / n)))}px "Segoe UI", system-ui, sans-serif`;
+
+      ctx.fillText(numStr, center - gridExtent / 2 - pad, pos);
+      ctx.fillText(numStr, center + gridExtent / 2 + pad, pos);
+    }
+    texture.update(false);
+  }
+
+  private animateLastMoveMarker(): void {
+    if (!this.lastMoveRing.isVisible) return;
+    const now = performance.now();
+    const t = now / 1000;
+    const since = (now - this.lastMovePulseAt) / 1000;
+    const pop = since >= 0 && since < 0.6 ? 1 + 1.2 * Math.exp(-since * 8) : 1;
+    const shimmer = 1 + 0.055 * Math.sin(t * 6);
+
+    this.lastMoveRing.scaling.set(pop * shimmer, 1, pop * shimmer);
+    this.lastMoveGlow.scaling.setAll(1 + 0.08 * Math.sin(t * 4));
+
+    const beaconBaseY = 1.48;
+    this.lastMoveBeacon.position.y = beaconBaseY + 0.07 * Math.sin(t * 3.8);
+    this.lastMoveBeacon.rotation.y = t * 2.2;
+    this.lastMoveBeacon.rotation.z = 0.12 * Math.sin(t * 1.6);
+    this.lastMoveBeacon.scaling.setAll(pop * (1 + 0.08 * Math.sin(t * 5)));
+
+    this.lastMovePillar.scaling.x = 1 + 0.12 * Math.sin(t * 4);
+    this.lastMovePillar.scaling.z = 1 + 0.12 * Math.sin(t * 4);
+
+    this.lastMoveMaterial.alpha = Math.min(
+      1,
+      0.72 + 0.22 * (0.5 + 0.5 * Math.sin(t * 6)) + (since >= 0 && since < 0.6 ? 0.18 : 0)
+    );
   }
 
   private worldCoordinate(position: number): number {
@@ -328,15 +652,20 @@ export class Board3D {
       this.buildDeadCube(wrapper, color);
       return wrapper;
     }
+    if (this.currentStyle === 'stones') {
+      this.buildStone(wrapper, color);
+      return wrapper;
+    }
     if (this.fallback) {
       this.buildPrimitive(wrapper, rank, color);
       return wrapper;
     }
 
     const file = PIECE_FILES[Math.max(0, Math.min(PIECE_FILES.length - 1, rank))];
-    const container = this.containers.get(file);
+    const containers = this.styleContainers.get(this.currentStyle);
+    const container = containers?.get(file);
     if (!container) {
-      this.buildPrimitive(wrapper, rank, color);
+      this.buildStone(wrapper, color);
       return wrapper;
     }
 
@@ -356,9 +685,7 @@ export class Board3D {
     }
 
     const { min, max } = root.getHierarchyBoundingVectors(true);
-    const dimensions = max.subtract(min);
-    const maxDimension = Math.max(dimensions.x, dimensions.y, dimensions.z) || 1;
-    const scale = 0.72 / maxDimension;
+    const scale = this.styleScales.get(this.currentStyle) ?? 1.05 / (max.y - min.y || 1);
     root.scaling.setAll(scale);
     const centerX = (min.x + max.x) / 2;
     const centerZ = (min.z + max.z) / 2;
@@ -367,8 +694,21 @@ export class Board3D {
     return wrapper;
   }
 
+  private buildStone(wrapper: TransformNode, color: number): void {
+    const material = color === BLACK ? this.blackMaterial : this.whiteMaterial;
+    const stone = MeshBuilder.CreateSphere(
+      'go-stone',
+      { diameterX: 0.94, diameterY: 0.32, diameterZ: 0.94, segments: 24 },
+      this.scene
+    );
+    stone.material = material;
+    stone.parent = wrapper;
+    stone.position.y = 0.16;
+    stone.isPickable = false;
+  }
+
   private buildDeadCube(wrapper: TransformNode, color: number): void {
-    const size = 0.34;
+    const size = 0.44;
     const height = size * 0.55;
     const cube = MeshBuilder.CreateBox(
       'dead-cube',
@@ -386,33 +726,33 @@ export class Board3D {
 
     const base = MeshBuilder.CreateCylinder(
       'primitive-base',
-      { height: 0.1, diameterTop: 0.44, diameterBottom: 0.5, tessellation: 24 },
+      { height: 0.12, diameterTop: 0.56, diameterBottom: 0.64, tessellation: 24 },
       this.scene
     );
     base.material = material;
     base.parent = wrapper;
-    base.position.y = 0.05;
+    base.position.y = 0.06;
     base.isPickable = false;
 
-    const bodyHeight = 0.2 + rank * 0.07;
+    const bodyHeight = 0.3 + rank * 0.11;
     const body = MeshBuilder.CreateCylinder(
       'primitive-body',
-      { height: bodyHeight, diameterTop: 0.16, diameterBottom: 0.3, tessellation: 24 },
+      { height: bodyHeight, diameterTop: 0.22, diameterBottom: 0.4, tessellation: 24 },
       this.scene
     );
     body.material = material;
     body.parent = wrapper;
-    body.position.y = 0.1 + bodyHeight / 2;
+    body.position.y = 0.12 + bodyHeight / 2;
     body.isPickable = false;
 
     const head = MeshBuilder.CreateSphere(
       'primitive-head',
-      { diameter: 0.14 + rank * 0.035, segments: 14 },
+      { diameter: 0.2 + rank * 0.05, segments: 14 },
       this.scene
     );
     head.material = material;
     head.parent = wrapper;
-    head.position.y = 0.1 + bodyHeight + 0.07;
+    head.position.y = 0.12 + bodyHeight + 0.1;
     head.isPickable = false;
   }
 
@@ -438,10 +778,135 @@ export class Board3D {
     }
   }
 
+  private explodePiece(piece: PieceHandle): void {
+    const position = piece.root.position.clone();
+    const color =
+      piece.color === BLACK ? new Color3(1.0, 0.36, 0.08) : new Color3(0.5, 0.86, 1.0);
+    this.spawnBurst(position.add(new Vector3(0, 0.24, 0)), color, 95, 4.6);
+    this.spawnShards(position, piece.color);
+    this.spawnShockwave(position, color);
+    piece.root.dispose();
+  }
+
+  private spawnBurst(position: Vector3, color: Color3, count: number, power: number): void {
+    const particles = new ParticleSystem(`burst-${this.effectSeed++}`, count * 2, this.scene);
+    particles.particleTexture = this.particleTexture;
+    particles.emitter = position.clone();
+    particles.minEmitBox = new Vector3(-0.12, -0.02, -0.12);
+    particles.maxEmitBox = new Vector3(0.12, 0.1, 0.12);
+    particles.color1 = new Color4(color.r, color.g, color.b, 1);
+    particles.color2 = new Color4(
+      Math.min(1, color.r + 0.45),
+      Math.min(1, color.g + 0.45),
+      Math.min(1, color.b + 0.45),
+      0.9
+    );
+    particles.colorDead = new Color4(color.r, color.g, color.b, 0);
+    particles.minSize = 0.05;
+    particles.maxSize = 0.16;
+    particles.minLifeTime = 0.35;
+    particles.maxLifeTime = 0.8;
+    particles.emitRate = 0;
+    particles.manualEmitCount = count;
+    particles.blendMode = ParticleSystem.BLENDMODE_ADD;
+    particles.direction1 = new Vector3(-power, 1.2, -power);
+    particles.direction2 = new Vector3(power, power + 2.2, power);
+    particles.minEmitPower = 0.6;
+    particles.maxEmitPower = power;
+    particles.gravity = new Vector3(0, -7, 0);
+    particles.minAngularSpeed = -5;
+    particles.maxAngularSpeed = 5;
+    particles.updateSpeed = 0.012;
+    particles.start();
+    window.setTimeout(() => {
+      try {
+        particles.dispose();
+      } catch {
+        // The scene may already be disposed.
+      }
+    }, 1500);
+  }
+
+  private spawnShards(position: Vector3, color: number): void {
+    const material = color === BLACK ? this.blackMaterial : this.whiteMaterial;
+    for (let i = 0; i < 8; i++) {
+      const size = 0.07 + Math.random() * 0.09;
+      const shard = MeshBuilder.CreateBox(
+        `capture-shard-${this.effectSeed++}`,
+        { size },
+        this.scene
+      );
+      shard.material = material;
+      shard.position.copyFrom(position);
+      shard.position.y += 0.18 + Math.random() * 0.2;
+      shard.rotation.set(
+        Math.random() * Math.PI,
+        Math.random() * Math.PI,
+        Math.random() * Math.PI
+      );
+      shard.isPickable = false;
+
+      const velocity = new Vector3(
+        (Math.random() - 0.5) * 4.5,
+        1.4 + Math.random() * 3,
+        (Math.random() - 0.5) * 4.5
+      );
+      const start = performance.now();
+      const observer = this.scene.onBeforeRenderObservable.add(() => {
+        const dt = Math.min(0.05, this.engine.getDeltaTime() / 1000);
+        const t = (performance.now() - start) / 1000;
+        if (t > 0.9) {
+          if (observer) this.scene.onBeforeRenderObservable.remove(observer);
+          shard.dispose();
+          return;
+        }
+        velocity.y -= 9.8 * dt;
+        shard.position.addInPlace(velocity.scale(dt));
+        shard.rotation.x += dt * 7;
+        shard.rotation.z += dt * 5;
+        shard.scaling.setAll(Math.max(0.01, 1 - t / 0.9));
+      });
+    }
+  }
+
+  private spawnShockwave(position: Vector3, color: Color3): void {
+    const material = new StandardMaterial(`shock-material-${this.effectSeed++}`, this.scene);
+    material.diffuseColor = Color3.Black();
+    material.emissiveColor = color.clone();
+    material.specularColor = Color3.Black();
+    material.disableLighting = true;
+    material.alpha = 0.75;
+    material.backFaceCulling = false;
+
+    const ring = MeshBuilder.CreateTorus(
+      `shock-ring-${this.effectSeed++}`,
+      { diameter: 0.7, thickness: 0.05, tessellation: 32 },
+      this.scene
+    );
+    ring.material = material;
+    ring.position.copyFrom(position);
+    ring.position.y += 0.06;
+    ring.isPickable = false;
+
+    const start = performance.now();
+    const observer = this.scene.onBeforeRenderObservable.add(() => {
+      const t = (performance.now() - start) / 500;
+      if (t >= 1) {
+        if (observer) this.scene.onBeforeRenderObservable.remove(observer);
+        ring.dispose();
+        material.dispose();
+        return;
+      }
+      ring.scaling.setAll(0.4 + t * 2.4);
+      material.alpha = 0.75 * (1 - t);
+    });
+  }
+
   private attachPointer(): void {
     let startX = 0;
     let startY = 0;
     let startTime = 0;
+    let lastHoverIndex: number | null = null;
 
     this.canvas.addEventListener('pointerdown', (event) => {
       startX = event.clientX;
@@ -456,6 +921,71 @@ export class Board3D {
       if (performance.now() - startTime > 800) return;
       this.pickIntersection(event);
     });
+
+    this.canvas.addEventListener('pointermove', (event) => {
+      if (!this.boardMesh) return;
+      const pick = this.scene.pick(event.offsetX, event.offsetY, (mesh) => mesh === this.boardMesh);
+      const point = pick?.pickedPoint;
+      if (!pick?.hit || !point) {
+        if (lastHoverIndex !== null) {
+          lastHoverIndex = null;
+          this.setHoverMarker(null);
+          this.hoverHandler?.(null);
+        }
+        return;
+      }
+
+      const n = this.size;
+      const half = (n - 1) / 2;
+      const col = Math.round(point.x / SPACING + half);
+      const row = Math.round(point.z / SPACING + half);
+      if (col < 0 || col >= n || row < 0 || row >= n) {
+        if (lastHoverIndex !== null) {
+          lastHoverIndex = null;
+          this.setHoverMarker(null);
+          this.hoverHandler?.(null);
+        }
+        return;
+      }
+
+      const x = (col - half) * SPACING;
+      const z = (row - half) * SPACING;
+      if (Math.hypot(point.x - x, point.z - z) > SPACING * 0.5) {
+        if (lastHoverIndex !== null) {
+          lastHoverIndex = null;
+          this.setHoverMarker(null);
+          this.hoverHandler?.(null);
+        }
+        return;
+      }
+
+      const index = row * n + col;
+      if (index !== lastHoverIndex) {
+        lastHoverIndex = index;
+        this.setHoverMarker(index);
+        this.hoverHandler?.(index);
+      }
+    });
+
+    this.canvas.addEventListener('pointerleave', () => {
+      if (lastHoverIndex !== null) {
+        lastHoverIndex = null;
+        this.setHoverMarker(null);
+        this.hoverHandler?.(null);
+      }
+    });
+  }
+
+  private setHoverMarker(index: number | null): void {
+    if (index === null) {
+      this.hoverMarker.isVisible = false;
+      return;
+    }
+    const n = this.size;
+    const row = Math.floor(index / n);
+    const col = index % n;
+    this.hoverMarker.position.set(this.worldCoordinate(col), 0.028, this.worldCoordinate(row));
+    this.hoverMarker.isVisible = true;
   }
 
   private pickIntersection(event: PointerEvent): void {

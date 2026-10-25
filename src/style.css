@@ -60,6 +60,19 @@ body {
   color: var(--muted);
 }
 
+#toolbar .toggle-control {
+  cursor: pointer;
+  user-select: none;
+}
+
+#toolbar input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+}
+
 #toolbar select,
 #toolbar input[type="number"] {
   background: var(--panel-2);
@@ -131,6 +144,88 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+#rank-legend {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 15;
+  width: 184px;
+  padding: 10px 12px 9px;
+  background: rgba(24, 17, 12, 0.82);
+  border: 1px solid #5a4130;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  font-size: 12px;
+}
+
+#rank-legend .legend-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+#rank-legend .legend-title span {
+  color: var(--muted);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+#rank-legend ul {
+  display: grid;
+  gap: 3px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+#rank-legend li {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+}
+
+#rank-legend .glyph {
+  color: var(--text);
+  font-family: "Segoe UI Symbol", "DejaVu Sans", sans-serif;
+  font-size: 19px;
+  line-height: 1;
+  text-align: center;
+}
+
+#rank-legend .name {
+  color: var(--muted);
+}
+
+#rank-legend .range {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+#rank-legend li.dead {
+  margin-top: 3px;
+  padding-top: 5px;
+  border-top: 1px solid #3a2a1e;
+}
+
+#rank-legend .dead .cube {
+  width: 13px;
+  height: 13px;
+  margin: 0 auto;
+  background: linear-gradient(135deg, #d9a066, #8c5a2b);
+  border: 1px solid #f2e6d8;
+  border-radius: 2px;
+}
+
 .overlay {
   position: absolute;
   inset: 0;
@@ -179,5 +274,15 @@ body {
   }
   #toolbar label {
     font-size: 12px;
+  }
+  #rank-legend {
+    top: 8px;
+    right: 8px;
+    width: 158px;
+    padding: 8px 9px;
+    font-size: 11px;
+  }
+  #rank-legend .glyph {
+    font-size: 17px;
   }
 }
