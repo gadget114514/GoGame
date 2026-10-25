@@ -53,6 +53,15 @@ export interface Translations {
   even: string;
   preview: string;
   paddedNet: string;
+  firstMove: string;
+  prevMove: string;
+  play: string;
+  pause: string;
+  nextMove: string;
+  lastMoveBtn: string;
+  speed: string;
+  replay: string;
+  sgfLoaded: string;
 }
 
 const DICTIONARIES: Record<Language, Translations> = {
@@ -108,7 +117,16 @@ const DICTIONARIES: Record<Language, Translations> = {
     byMargin: ' by {margin}',
     even: 'Even',
     preview: 'Preview',
-    paddedNet: 'padded 19x19 net'
+    paddedNet: 'padded 19x19 net',
+    firstMove: 'First move',
+    prevMove: 'Previous move',
+    play: 'Play',
+    pause: 'Pause',
+    nextMove: 'Next move',
+    lastMoveBtn: 'Last move',
+    speed: 'Speed',
+    replay: 'Replay',
+    sgfLoaded: 'Loaded SGF: {moves} moves'
   },
   ja: {
     board: '盤面',
@@ -162,7 +180,16 @@ const DICTIONARIES: Record<Language, Translations> = {
     byMargin: ' {margin}目勝ち',
     even: '互角',
     preview: '予測',
-    paddedNet: '19路補正モデル'
+    paddedNet: '19路補正モデル',
+    firstMove: '最初の手',
+    prevMove: '前の一手',
+    play: '再生',
+    pause: '一時停止',
+    nextMove: '次の一手',
+    lastMoveBtn: '最後の手',
+    speed: '速度',
+    replay: '棋譜再生',
+    sgfLoaded: 'SGF読込完了: {moves}手'
   },
   es: {
     board: 'Tablero',
@@ -216,7 +243,16 @@ const DICTIONARIES: Record<Language, Translations> = {
     byMargin: ' por {margin}',
     even: 'Igualado',
     preview: 'Prevista',
-    paddedNet: 'red 19x19 ajustada'
+    paddedNet: 'red 19x19 ajustada',
+    firstMove: 'Primera jugada',
+    prevMove: 'Jugada anterior',
+    play: 'Reproducir',
+    pause: 'Pausar',
+    nextMove: 'Siguiente jugada',
+    lastMoveBtn: 'Última jugada',
+    speed: 'Velocidad',
+    replay: 'Reproducir partida',
+    sgfLoaded: 'SGF cargado: {moves} jugadas'
   }
 };
 

@@ -58,6 +58,29 @@
         </div>
       </header>
 
+      <nav id="replay-bar" class="replay-bar" aria-label="SGF Playback">
+        <div class="replay-group replay-nav">
+          <button id="btn-first" data-i18n-title="firstMove" title="First move">&#x23EE;</button>
+          <button id="btn-prev" data-i18n-title="prevMove" title="Previous move">&#x25C0;</button>
+          <button id="btn-play" data-i18n-title="play" title="Play / Pause">&#x25B6;</button>
+          <button id="btn-next" data-i18n-title="nextMove" title="Next move">&#x25B6;&#xFE0E;</button>
+          <button id="btn-last" data-i18n-title="lastMoveBtn" title="Last move">&#x23ED;</button>
+        </div>
+        <div class="replay-group replay-slider-group">
+          <input id="replay-slider" type="range" min="0" max="0" value="0" />
+          <span id="replay-counter">0 / 0</span>
+        </div>
+        <div class="replay-group replay-speed-group">
+          <label><span data-i18n="speed">Speed</span>
+            <select id="replay-speed">
+              <option value="1500">0.7x</option>
+              <option value="1000" selected>1.0x</option>
+              <option value="500">2.0x</option>
+            </select>
+          </label>
+        </div>
+      </nav>
+
       <main id="stage">
         <canvas id="scene3d" touch-action="none"></canvas>
         <canvas id="scene2d" hidden></canvas>

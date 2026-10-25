@@ -1,4 +1,5 @@
 import { neighbors, DEFAULT_KOMI, type BoardSize } from './BoardSize';
+import { generateSGF, parseSGF } from './sgf';
 
 export const EMPTY = 0;
 export const BLACK = 1;
@@ -264,51 +265,36 @@ export class Goban {
   }
 
   toSGF(): string {
-    const letters = 'abcdefghijklmnopqrstuvwxyz';
-    let sgf = `(;GM[1]FF[4]CA[UTF-8]AP[GoGame3D:0.1]SZ[${this.size}]KM[${this.komi}]RU[Chinese]`;
-    for (const move of this.moves) {
-      const prefix = move.color === BLACK ? 'B' : 'W';
-      if (move.move === null) {
-        sgf += `;${prefix}[]`;
-      } else {
-        const row = Math.floor(move.move / this.size);
-        const col = move.move % this.size;
-        sgf += `;${prefix}[${letters[col]}${letters[row]}]`;
-      }
-    }
-    return `${sgf})`;
+    return generateSGF(this);
   }
 
   loadSGF(sgf: string): void {
+    const parsed = parseSGF(sgf);
+    if (parsed.size !== this.size) {
+      throw new Error(`SGF is for a ${parsed.size}x${parsed.size} board`);
+    }
     this.reset();
-    const sizeMatch = sgf.match(/SZ\[(\d+)\]/);
-    if (sizeMatch) {
-      const parsed = Number(sizeMatch[1]);
-      if (parsed !== this.size) {
-        throw new Error(`SGF is for a ${parsed}x${parsed} board`);
+    this.komi = parsed.komi;
+
+    // Place any handicap stones
+    for (const stone of parsed.handicapStones) {
+      if (stone >= 0 && stone < this.area) {
+        this.board[stone] = BLACK;
       }
     }
-    const komiMatch = sgf.match(/KM\[([\d.]+)\]/);
-    if (komiMatch) this.komi = Number(komiMatch[1]);
+    if (parsed.handicapStones.length > 0) {
+      this.side = WHITE;
+    }
 
-    const letters = 'abcdefghijklmnopqrstuvwxyz';
-    const moveRe = /;\s*([BW])\[([a-z]{0,2})\]/g;
-    let match: RegExpExecArray | null;
-    while ((match = moveRe.exec(sgf)) !== null) {
-      const color = match[1] === 'B' ? BLACK : WHITE;
-      if (this.side !== color) {
-        // Skip malformed move ordering rather than corrupting state.
-        continue;
+    for (const m of parsed.moves) {
+      if (this.side !== m.color) {
+        this.side = m.color;
       }
-      const coords = match[2];
-      if (coords.length < 2) {
+      if (m.move === null) {
         this.pass();
-        continue;
+      } else {
+        this.play(m.move);
       }
-      const col = letters.indexOf(coords[0]);
-      const row = letters.indexOf(coords[1]);
-      if (col < 0 || row < 0 || col >= this.size || row >= this.size) continue;
-      this.play(row * this.size + col);
     }
   }
 }
