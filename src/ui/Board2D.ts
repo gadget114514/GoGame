@@ -16,6 +16,7 @@ export class Board2D {
   private clickHandler: ((index: number) => void) | null = null;
   private hoverHandler: ((index: number | null) => void) | null = null;
   private hoverIndex: number | null = null;
+  private perspective: 'black' | 'white' = 'black';
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const context = canvas.getContext('2d');
@@ -25,6 +26,12 @@ export class Board2D {
     canvas.addEventListener('pointerup', (event) => this.onPointerUp(event));
     canvas.addEventListener('pointermove', (event) => this.onPointerMove(event));
     canvas.addEventListener('pointerleave', () => this.onPointerLeave());
+  }
+
+  setPerspective(side: 'black' | 'white'): void {
+    if (this.perspective === side) return;
+    this.perspective = side;
+    this.render();
   }
 
   setOnIntersectionClick(handler: (index: number) => void): void {
@@ -67,6 +74,23 @@ export class Board2D {
     this.cell = extent / Math.max(1, this.size - 1);
   }
 
+  private coordToCanvas(col: number, row: number): { x: number; y: number } {
+    const drawCol = this.perspective === 'white' ? this.size - 1 - col : col;
+    const drawRow = this.perspective === 'white' ? this.size - 1 - row : row;
+    return {
+      x: this.margin + drawCol * this.cell,
+      y: this.margin + drawRow * this.cell
+    };
+  }
+
+  private canvasToCoord(canvasX: number, canvasY: number): { col: number; row: number } {
+    const rawCol = Math.round((canvasX - this.margin) / this.cell);
+    const rawRow = Math.round((canvasY - this.margin) / this.cell);
+    const col = this.perspective === 'white' ? this.size - 1 - rawCol : rawCol;
+    const row = this.perspective === 'white' ? this.size - 1 - rawRow : rawRow;
+    return { col, row };
+  }
+
   private render(): void {
     const { ctx } = this;
     if (this.cssWidth <= 1) return;
@@ -91,31 +115,42 @@ export class Board2D {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const labelPad = Math.max(11, this.cell * 0.44);
+    const isWhite = this.perspective === 'white';
 
     for (let i = 0; i < this.size; i++) {
       const pos = this.margin + i * this.cell;
 
-      // Column letters (top and bottom)
-      const letter = COORD_LETTERS[i] ?? '';
-      const isColActive = i === lastCol;
-      ctx.fillStyle = isColActive ? '#b45309' : 'rgba(65, 40, 18, 0.72)';
+      // Column labels (top and bottom border)
+      // For Black: Left is 1, Right is size (Top-Left is 1,1; Bottom-Right is size,size)
+      // For White: Left is size, Right is 1 (Screen Top-Left is size,size; Bottom-Right is 1,1)
+      const colNum = isWhite ? this.size - i : i + 1;
+      const colStr = String(colNum);
+      const actualCol = isWhite ? this.size - 1 - i : i;
+      const isColActive = actualCol === lastCol;
+
+      ctx.fillStyle = isColActive ? '#d97706' : '#221408';
       ctx.font = isColActive
-        ? `700 ${Math.max(11, this.cell * 0.36)}px "Segoe UI", system-ui, sans-serif`
-        : `600 ${Math.max(10, this.cell * 0.3)}px "Segoe UI", system-ui, sans-serif`;
+        ? `bold ${Math.max(12, this.cell * 0.38)}px "Segoe UI", -apple-system, system-ui, sans-serif`
+        : `700 ${Math.max(11, this.cell * 0.34)}px "Segoe UI", -apple-system, system-ui, sans-serif`;
 
-      ctx.fillText(letter, pos, this.margin - labelPad);
-      ctx.fillText(letter, pos, this.margin + span + labelPad);
+      ctx.fillText(colStr, pos, this.margin - labelPad);
+      ctx.fillText(colStr, pos, this.margin + span + labelPad);
 
-      // Row numbers (left and right)
-      const numStr = String(this.size - i);
-      const isRowActive = i === lastRow;
-      ctx.fillStyle = isRowActive ? '#b45309' : 'rgba(65, 40, 18, 0.72)';
+      // Row labels (left and right border)
+      // For Black: Top is 1, Bottom is size (Top-Left is 1,1; Bottom-Right is size,size)
+      // For White: Top is size, Bottom is 1 (Screen Top-Left is size,size; Bottom-Right is 1,1)
+      const rowNum = isWhite ? this.size - i : i + 1;
+      const rowStr = String(rowNum);
+      const actualRow = isWhite ? this.size - 1 - i : i;
+      const isRowActive = actualRow === lastRow;
+
+      ctx.fillStyle = isRowActive ? '#d97706' : '#221408';
       ctx.font = isRowActive
-        ? `700 ${Math.max(11, this.cell * 0.36)}px "Segoe UI", system-ui, sans-serif`
-        : `600 ${Math.max(10, this.cell * 0.3)}px "Segoe UI", system-ui, sans-serif`;
+        ? `bold ${Math.max(12, this.cell * 0.38)}px "Segoe UI", -apple-system, system-ui, sans-serif`
+        : `700 ${Math.max(11, this.cell * 0.34)}px "Segoe UI", -apple-system, system-ui, sans-serif`;
 
-      ctx.fillText(numStr, this.margin - labelPad, pos);
-      ctx.fillText(numStr, this.margin + span + labelPad, pos);
+      ctx.fillText(rowStr, this.margin - labelPad, pos);
+      ctx.fillText(rowStr, this.margin + span + labelPad, pos);
     }
 
     // Grid.
@@ -136,10 +171,11 @@ export class Board2D {
     for (const index of starPoints(this.size as 9 | 13 | 19)) {
       const row = Math.floor(index / this.size);
       const col = index % this.size;
+      const { x, y } = this.coordToCanvas(col, row);
       ctx.beginPath();
       ctx.arc(
-        this.margin + col * this.cell,
-        this.margin + row * this.cell,
+        x,
+        y,
         Math.max(1.5, this.cell * 0.07),
         0,
         Math.PI * 2
@@ -154,10 +190,11 @@ export class Board2D {
         const row = Math.floor(index / this.size);
         const col = index % this.size;
         const [r, g, b, a] = heatColor(ownership[index]);
+        const { x, y } = this.coordToCanvas(col, row);
         ctx.beginPath();
         ctx.arc(
-          this.margin + col * this.cell,
-          this.margin + row * this.cell,
+          x,
+          y,
           this.cell * 0.42,
           0,
           Math.PI * 2
@@ -174,8 +211,7 @@ export class Board2D {
       if (color !== BLACK && color !== WHITE) continue;
       const row = Math.floor(index / this.size);
       const col = index % this.size;
-      const x = this.margin + col * this.cell;
-      const y = this.margin + row * this.cell;
+      const { x, y } = this.coordToCanvas(col, row);
       const ownership = this.evaluation?.ownership[index] ?? 0;
       const { dead } = pieceRank(ownership, color, false);
       if (dead) {
@@ -216,8 +252,7 @@ export class Board2D {
       const row = Math.floor(last / this.size);
       const col = last % this.size;
       const color = this.goban?.board[last] ?? BLACK;
-      const cx = this.margin + col * this.cell;
-      const cy = this.margin + row * this.cell;
+      const { x: cx, y: cy } = this.coordToCanvas(col, row);
 
       // Outer contrasting accent ring
       ctx.beginPath();
@@ -237,8 +272,7 @@ export class Board2D {
     if (this.hoverIndex !== null && this.goban && this.goban.board[this.hoverIndex] === 0) {
       const hRow = Math.floor(this.hoverIndex / this.size);
       const hCol = this.hoverIndex % this.size;
-      const hx = this.margin + hCol * this.cell;
-      const hy = this.margin + hRow * this.cell;
+      const { x: hx, y: hy } = this.coordToCanvas(hCol, hRow);
       ctx.beginPath();
       ctx.arc(hx, hy, radius * 0.88, 0, Math.PI * 2);
       ctx.fillStyle = this.goban.side === BLACK ? 'rgba(25, 25, 30, 0.45)' : 'rgba(255, 255, 255, 0.65)';
@@ -251,10 +285,7 @@ export class Board2D {
 
   private onPointerMove(event: PointerEvent): void {
     if (!this.goban) return;
-    const x = event.offsetX;
-    const y = event.offsetY;
-    const col = Math.round((x - this.margin) / this.cell);
-    const row = Math.round((y - this.margin) / this.cell);
+    const { col, row } = this.canvasToCoord(event.offsetX, event.offsetY);
     if (col < 0 || col >= this.size || row < 0 || row >= this.size) {
       if (this.hoverIndex !== null) {
         this.hoverIndex = null;
@@ -263,9 +294,8 @@ export class Board2D {
       }
       return;
     }
-    const cx = this.margin + col * this.cell;
-    const cy = this.margin + row * this.cell;
-    if (Math.hypot(x - cx, y - cy) > this.cell * 0.5) {
+    const { x: cx, y: cy } = this.coordToCanvas(col, row);
+    if (Math.hypot(event.offsetX - cx, event.offsetY - cy) > this.cell * 0.5) {
       if (this.hoverIndex !== null) {
         this.hoverIndex = null;
         this.render();
@@ -292,14 +322,10 @@ export class Board2D {
 
   private onPointerUp(event: PointerEvent): void {
     if (!this.goban || !this.clickHandler) return;
-    const x = event.offsetX;
-    const y = event.offsetY;
-    const col = Math.round((x - this.margin) / this.cell);
-    const row = Math.round((y - this.margin) / this.cell);
+    const { col, row } = this.canvasToCoord(event.offsetX, event.offsetY);
     if (col < 0 || col >= this.size || row < 0 || row >= this.size) return;
-    const cx = this.margin + col * this.cell;
-    const cy = this.margin + row * this.cell;
-    if (Math.hypot(x - cx, y - cy) > this.cell * 0.5) return;
+    const { x: cx, y: cy } = this.coordToCanvas(col, row);
+    if (Math.hypot(event.offsetX - cx, event.offsetY - cy) > this.cell * 0.5) return;
     this.clickHandler(row * this.size + col);
   }
 

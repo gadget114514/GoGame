@@ -12,6 +12,7 @@ interface Elements {
   canvas2d: HTMLCanvasElement;
   boardSize: HTMLSelectElement;
   aiLevel: HTMLSelectElement;
+  playerSide: HTMLSelectElement;
   pieceStyle: HTMLSelectElement;
   languageSelect: HTMLSelectElement;
   toggleHoverEval: HTMLInputElement;
@@ -65,6 +66,7 @@ export class GameController {
 
   private goban: Goban;
   private level: AILevel = 'dan';
+  private playerSide: 'black' | 'white' = 'black';
   private view: ViewMode = '3d';
   private evaluation: Evaluation | null = null;
   private busy = false;
@@ -89,6 +91,7 @@ export class GameController {
       canvas2d: requireElement('scene2d'),
       boardSize: requireElement('board-size'),
       aiLevel: requireElement('ai-level'),
+      playerSide: requireElement('player-side'),
       pieceStyle: requireElement('piece-style'),
       languageSelect: requireElement('language-select'),
       toggleHoverEval: requireElement('toggle-hover-eval'),
@@ -121,6 +124,10 @@ export class GameController {
 
     this.level = this.els.aiLevel.value === 'kyu' ? 'kyu' : 'dan';
 
+    const savedSide = (localStorage.getItem('gogame:playerSide') as 'black' | 'white') || 'black';
+    this.playerSide = savedSide;
+    this.els.playerSide.value = savedSide;
+
     const savedStyle = (localStorage.getItem('gogame:pieceStyle') as PieceStyle) || 'clayfoot';
     this.els.pieceStyle.value = savedStyle;
 
@@ -136,8 +143,10 @@ export class GameController {
     this.board3d = new Board3D(this.els.canvas3d);
     this.board2d = new Board2D(this.els.canvas2d);
     this.board3d.setBoardSize(size);
+    this.board3d.setPerspective(savedSide);
     void this.board3d.setPieceStyle(savedStyle);
     this.board2d.resize();
+    this.board2d.setPerspective(savedSide);
 
     this.board3d.setOnIntersectionClick((index) => void this.humanPlay(index));
     this.board2d.setOnIntersectionClick((index) => void this.humanPlay(index));
@@ -162,6 +171,9 @@ export class GameController {
     try {
       await this.engine.initialize();
       await this.refreshEvaluation(true);
+      if (this.playerSide === 'white' && this.goban.moves.length === 0) {
+        await this.aiTurn();
+      }
     } catch (error) {
       console.error('KataGo initialization failed', error);
       this.els.turn.textContent = t('aiUnavailable');
@@ -178,6 +190,10 @@ export class GameController {
     this.els.view.addEventListener('click', () => this.toggleView());
 
     this.els.boardSize.addEventListener('change', () => this.changeBoardSize());
+    this.els.playerSide.addEventListener('change', () => {
+      const side = (this.els.playerSide.value as 'black' | 'white') || 'black';
+      this.setPlayerSide(side);
+    });
     this.els.pieceStyle.addEventListener('change', () => {
       const style = (this.els.pieceStyle.value as PieceStyle) || 'clayfoot';
       localStorage.setItem('gogame:pieceStyle', style);
@@ -283,6 +299,18 @@ export class GameController {
     return value;
   }
 
+  private setPlayerSide(side: 'black' | 'white'): void {
+    if (this.playerSide === side) return;
+    this.playerSide = side;
+    localStorage.setItem('gogame:playerSide', side);
+    this.board3d.setPerspective(side);
+    this.board2d.setPerspective(side);
+    this.updateStatus();
+    if (this.goban.moves.length === 0 && side === 'white' && !this.busy) {
+      void this.aiTurn();
+    }
+  }
+
   private startNewGame(): void {
     this.stopReplay();
     this.clearHover();
@@ -292,11 +320,16 @@ export class GameController {
     this.evaluation = null;
     this.gameOver = false;
     this.board3d.setBoardSize(size);
+    this.board3d.setPerspective(this.playerSide);
     this.board2d.resize();
+    this.board2d.setPerspective(this.playerSide);
     this.resetHistory();
     this.render();
     this.updateStatus();
     void this.refreshEvaluation(true);
+    if (this.playerSide === 'white') {
+      void this.aiTurn();
+    }
   }
 
   private changeBoardSize(): void {
@@ -310,11 +343,16 @@ export class GameController {
     this.evaluation = null;
     this.gameOver = false;
     this.board3d.setBoardSize(size);
+    this.board3d.setPerspective(this.playerSide);
     this.board2d.resize();
+    this.board2d.setPerspective(this.playerSide);
     this.resetHistory();
     this.render();
     this.updateStatus();
     void this.refreshEvaluation(true);
+    if (this.playerSide === 'white') {
+      void this.aiTurn();
+    }
   }
 
   private toggleView(): void {
@@ -488,7 +526,8 @@ export class GameController {
     }
 
     if (this.gameOver) return;
-    if (this.goban.side !== BLACK) return;
+    const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
+    if (this.goban.side !== humanColor) return;
     if (!this.goban.play(index)) return;
 
     this.clearHover();
@@ -514,7 +553,8 @@ export class GameController {
     }
 
     if (this.gameOver) return;
-    if (this.goban.side !== BLACK) return;
+    const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
+    if (this.goban.side !== humanColor) return;
 
     this.clearHover();
     this.hoverCache.clear();
@@ -576,12 +616,13 @@ export class GameController {
 
     if (this.currentHistoryIndex <= 0) return;
 
+    const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
     let targetIndex = this.currentHistoryIndex;
     let undone = 0;
     while (targetIndex > 0 && undone < 2) {
       targetIndex--;
       undone++;
-      if (this.history[targetIndex].side === BLACK) break;
+      if (this.history[targetIndex].side === humanColor) break;
     }
 
     this.history = this.history.slice(0, targetIndex + 1);
@@ -609,6 +650,12 @@ export class GameController {
 
   private onHoverIntersection(index: number | null): void {
     if (!this.hoverEvalEnabled || this.busy || this.gameOver) {
+      if (this.hoverIndex !== null) this.clearHover();
+      return;
+    }
+
+    const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
+    if (this.goban.side !== humanColor) {
       if (this.hoverIndex !== null) this.clearHover();
       return;
     }
@@ -675,6 +722,15 @@ export class GameController {
     this.board2d.update(this.goban, activeEval);
   }
 
+  private formatIntersection(index: number): string {
+    const col = index % this.goban.size;
+    const row = Math.floor(index / this.goban.size);
+    const colNum = col + 1;
+    const rowNum = row + 1;
+    const standard = formatCoordinate(index, this.goban.size);
+    return `${colNum},${rowNum} (${standard})`;
+  }
+
   private updateStatus(): void {
     let lastInfo = '';
     if (this.goban.moves.length > 0) {
@@ -682,7 +738,7 @@ export class GameController {
       const lastColor = lastRecord.color === BLACK ? t('black') : t('white');
       const coord =
         lastRecord.move !== null
-          ? formatCoordinate(lastRecord.move, this.goban.size)
+          ? this.formatIntersection(lastRecord.move)
           : t('passMove');
       lastInfo = ` · ${t('lastMove', { color: lastColor, coord })}`;
     }
@@ -701,10 +757,14 @@ export class GameController {
     }
 
     const side = this.goban.side === BLACK ? t('black') : t('white');
+    const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
+    const isHumanTurn = this.goban.side === humanColor;
+    const whoseTurn = isHumanTurn ? '' : ' [AI]';
+
     this.els.turn.textContent =
       this.goban.moves.length === 0
-        ? `${t('blackToPlay')}${commentText}`
-        : `${t('turnToPlay', { side, move: this.goban.moves.length + 1 })}${lastInfo}${commentText}`;
+        ? `${t('blackToPlay')}${whoseTurn}${commentText}`
+        : `${t('turnToPlay', { side, move: this.goban.moves.length + 1 })}${whoseTurn}${lastInfo}${commentText}`;
 
     const activeEval = this.hoverEvaluation ?? this.evaluation;
     if (activeEval) {
@@ -718,7 +778,7 @@ export class GameController {
       const padded = activeEval.padded ? ` · ${t('paddedNet')}` : '';
       const isHover = this.hoverEvaluation !== null && this.hoverIndex !== null;
       const hoverPrefix = isHover
-        ? `[${t('preview')} ${formatCoordinate(this.hoverIndex, this.goban.size)}] `
+        ? `[${t('preview')} ${this.formatIntersection(this.hoverIndex!)}] `
         : '';
       this.els.score.textContent = `${hoverPrefix}${label} · ${winLabel}${padded}`;
     } else {
@@ -751,9 +811,11 @@ export class GameController {
     }
 
     const today = new Date().toISOString().split('T')[0];
+    const pb = this.playerSide === 'black' ? 'Human (Black)' : `KataGo AI (${this.level.toUpperCase()})`;
+    const pw = this.playerSide === 'white' ? 'Human (White)' : `KataGo AI (${this.level.toUpperCase()})`;
     const sgfText = generateSGF(this.goban, {
-      blackPlayer: 'Human (Black)',
-      whitePlayer: `KataGo AI (${this.level.toUpperCase()})`,
+      blackPlayer: pb,
+      whitePlayer: pw,
       result: resultStr,
       date: today,
       rules: 'Chinese'
@@ -790,7 +852,11 @@ export class GameController {
       this.els.komi.value = String(parsed.komi);
       this.goban = new Goban(size, parsed.komi);
       this.board3d.setBoardSize(size);
+      this.board3d.setPerspective('black');
       this.board2d.resize();
+      this.board2d.setPerspective('black');
+      this.playerSide = 'black';
+      this.els.playerSide.value = 'black';
 
       this.history = [];
 

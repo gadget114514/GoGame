@@ -62,6 +62,9 @@ export interface Translations {
   speed: string;
   replay: string;
   sgfLoaded: string;
+  playerSide: string;
+  sideBlack: string;
+  sideWhite: string;
 }
 
 const DICTIONARIES: Record<Language, Translations> = {
@@ -74,6 +77,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     pieceClayfoot: 'Clayfoot Studios',
     pieceDarkYagami: 'Dark Yagami',
     pieceStones: 'Traditional Stones',
+    playerSide: 'Player Side',
+    sideBlack: 'Black (First)',
+    sideWhite: 'White (Second)',
     komi: 'Komi',
     language: 'Language',
     hoverEval: 'Hover Eval',
@@ -137,6 +143,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     pieceClayfoot: 'Clayfoot Studios',
     pieceDarkYagami: 'Dark Yagami',
     pieceStones: '伝統的な碁石',
+    playerSide: '手番',
+    sideBlack: '黒番 (先手)',
+    sideWhite: '白番 (後手)',
     komi: 'コミ',
     language: '言語',
     hoverEval: 'ホバー予測',
@@ -200,6 +209,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     pieceClayfoot: 'Clayfoot Studios',
     pieceDarkYagami: 'Dark Yagami',
     pieceStones: 'Piedras tradicionales',
+    playerSide: 'Bando',
+    sideBlack: 'Negras (Primera)',
+    sideWhite: 'Blancas (Segunda)',
     komi: 'Komi',
     language: 'Idioma',
     hoverEval: 'Eval. al pasar',

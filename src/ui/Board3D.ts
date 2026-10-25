@@ -66,6 +66,8 @@ export class Board3D {
   private coordTexture: DynamicTexture | null = null;
 
   private currentStyle: PieceStyle = 'clayfoot';
+  private perspective: 'black' | 'white' = 'black';
+  private directional: DirectionalLight;
   private styleContainers = new Map<PieceStyle, Map<PieceFile, AssetContainer>>();
   private styleScales = new Map<PieceStyle, number>();
   private pieces = new Map<number, PieceHandle>();
@@ -97,7 +99,7 @@ export class Board3D {
 
     this.camera = new ArcRotateCamera(
       'camera',
-      Math.PI / 2,
+      -Math.PI / 2,
       0.82,
       26,
       Vector3.Zero(),
@@ -116,9 +118,10 @@ export class Board3D {
     hemi.intensity = 0.9;
     hemi.groundColor = new Color3(0.16, 0.11, 0.07);
 
-    const directional = new DirectionalLight('directional', new Vector3(-0.5, -1, -0.4), this.scene);
+    const directional = new DirectionalLight('directional', new Vector3(-0.35, -1, 0.45), this.scene);
     directional.intensity = 0.75;
-    directional.position = new Vector3(12, 24, 12);
+    directional.position = new Vector3(10, 24, -14);
+    this.directional = directional;
 
     this.woodMaterial = new StandardMaterial('wood', this.scene);
     this.woodMaterial.diffuseColor = new Color3(0.74, 0.5, 0.27);
@@ -239,6 +242,34 @@ export class Board3D {
     this.engine.runRenderLoop(() => this.scene.render());
 
     void this.setPieceStyle('clayfoot');
+  }
+
+  setPerspective(side: 'black' | 'white'): void {
+    if (this.perspective === side) return;
+    this.perspective = side;
+    const targetAlpha = side === 'white' ? Math.PI / 2 : -Math.PI / 2;
+    this.camera.alpha = targetAlpha;
+
+    if (this.coordPlane) {
+      this.coordPlane.rotation.y = side === 'white' ? Math.PI : 0;
+    }
+    if (this.heatPlane) {
+      this.heatPlane.rotation.y = side === 'white' ? Math.PI : 0;
+    }
+    if (this.directional) {
+      if (side === 'white') {
+        this.directional.position.set(-10, 24, 14);
+        this.directional.direction.set(0.35, -1, -0.45);
+      } else {
+        this.directional.position.set(10, 24, -14);
+        this.directional.direction.set(-0.35, -1, 0.45);
+      }
+    }
+    if (this.lastState) {
+      this.update(this.lastState);
+    } else {
+      this.drawCoordinates(null);
+    }
   }
 
   async setPieceStyle(style: PieceStyle): Promise<void> {
@@ -369,7 +400,7 @@ export class Board3D {
         this.scene
       );
       star.rotation.x = -Math.PI / 2;
-      star.position.set(col * SPACING - half, 0.02, row * SPACING - half);
+      star.position.set(this.worldCoordinateX(col), 0.02, this.worldCoordinateZ(row));
       star.material = this.starMaterial;
       star.isPickable = false;
       this.boardNodes.push(star);
@@ -403,6 +434,7 @@ export class Board3D {
       this.scene
     );
     plane.rotation.x = -Math.PI / 2;
+    plane.rotation.y = this.perspective === 'white' ? Math.PI : 0;
     plane.position.y = 0.024;
     plane.material = heatMaterial;
     plane.isPickable = false;
@@ -426,7 +458,7 @@ export class Board3D {
     coordMaterial.emissiveTexture = coordTexture;
     coordMaterial.useAlphaFromDiffuseTexture = true;
     coordMaterial.diffuseColor = new Color3(1, 1, 1);
-    coordMaterial.emissiveColor = new Color3(0.65, 0.55, 0.45);
+    coordMaterial.emissiveColor = new Color3(1, 1, 1);
     coordMaterial.specularColor = Color3.Black();
     coordMaterial.disableLighting = true;
     coordMaterial.backFaceCulling = false;
@@ -437,6 +469,7 @@ export class Board3D {
       this.scene
     );
     coordPlane.rotation.x = -Math.PI / 2;
+    coordPlane.rotation.y = this.perspective === 'white' ? Math.PI : 0;
     coordPlane.position.y = 0.016;
     coordPlane.material = coordMaterial;
     coordPlane.isPickable = false;
@@ -468,13 +501,16 @@ export class Board3D {
     context.clearRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
 
     const ownership = state.evaluation?.ownership;
+    const isWhite = this.perspective === 'white';
     if (ownership && ownership.length >= n * n) {
       for (let row = 0; row < n; row++) {
         for (let col = 0; col < n; col++) {
           const value = ownership[row * n + col];
           const [r, g, b, a] = heatColor(value);
-          const x = (col + 0.5) * cell;
-          const y = (row + 0.5) * cell;
+          const drawCol = isWhite ? n - 1 - col : col;
+          const drawRow = isWhite ? n - 1 - row : row;
+          const x = (drawCol + 0.5) * cell;
+          const y = (drawRow + 0.5) * cell;
           context.beginPath();
           context.arc(x, y, cell * 0.42, 0, Math.PI * 2);
           context.fillStyle = `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${a.toFixed(3)})`;
@@ -507,7 +543,7 @@ export class Board3D {
           const root = this.createPieceNode(rank, color, index, dead);
           const row = Math.floor(index / n);
           const col = index % n;
-          root.position.set(this.worldCoordinate(col), 0.03, this.worldCoordinate(row));
+          root.position.set(this.worldCoordinateX(col), 0.03, this.worldCoordinateZ(row));
           this.animateDrop(root);
           this.pieces.set(index, { root, rank, color, dead });
         }
@@ -542,8 +578,8 @@ export class Board3D {
     const n = state.goban.size;
     const row = Math.floor(last / n);
     const col = last % n;
-    const x = this.worldCoordinate(col);
-    const z = this.worldCoordinate(row);
+    const x = this.worldCoordinateX(col);
+    const z = this.worldCoordinateZ(row);
     const color = state.goban.board[last] === WHITE ? WHITE_MOVE_COLOR : BLACK_MOVE_COLOR;
 
     this.lastMoveMaterial.emissiveColor.copyFrom(color);
@@ -585,33 +621,44 @@ export class Board3D {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    const pad = Math.max(16, (size - gridExtent) / 3.4);
+    const pad = Math.max(18, (size - gridExtent) / 3.0);
+    const isWhite = this.perspective === 'white';
 
     for (let i = 0; i < n; i++) {
       const frac = n > 1 ? i / (n - 1) - 0.5 : 0;
       const pos = center + frac * gridExtent;
 
-      // Column letters (top and bottom)
-      const letter = COORD_LETTERS[i] ?? '';
-      const isColActive = i === lastCol;
-      ctx.fillStyle = isColActive ? '#f59e0b' : 'rgba(55, 36, 18, 0.85)';
+      // Column labels (top and bottom border)
+      // For Black: Left is 1, Right is n (Top-Left is 1,1; Bottom-Right is n,n)
+      // For White: Left is n, Right is 1 (Screen Top-Left is n,n; Bottom-Right is 1,1)
+      const colNum = isWhite ? n - i : i + 1;
+      const colStr = String(colNum);
+      const actualCol = isWhite ? n - 1 - i : i;
+      const isColActive = actualCol === lastCol;
+
+      ctx.fillStyle = isColActive ? '#d97706' : '#221408';
       ctx.font = isColActive
-        ? `bold ${Math.max(15, Math.round(26 * (19 / n)))}px "Segoe UI", system-ui, sans-serif`
-        : `600 ${Math.max(13, Math.round(22 * (19 / n)))}px "Segoe UI", system-ui, sans-serif`;
+        ? `bold ${Math.max(16, Math.round(28 * (19 / n)))}px "Segoe UI", -apple-system, system-ui, sans-serif`
+        : `700 ${Math.max(14, Math.round(24 * (19 / n)))}px "Segoe UI", -apple-system, system-ui, sans-serif`;
 
-      ctx.fillText(letter, pos, center - gridExtent / 2 - pad);
-      ctx.fillText(letter, pos, center + gridExtent / 2 + pad);
+      ctx.fillText(colStr, pos, center - gridExtent / 2 - pad);
+      ctx.fillText(colStr, pos, center + gridExtent / 2 + pad);
 
-      // Row numbers (left and right)
-      const numStr = String(n - i);
-      const isRowActive = i === lastRow;
-      ctx.fillStyle = isRowActive ? '#f59e0b' : 'rgba(55, 36, 18, 0.85)';
+      // Row labels (left and right border)
+      // For Black: Top is 1, Bottom is n (Top-Left is 1,1; Bottom-Right is n,n)
+      // For White: Top is n, Bottom is 1 (Screen Top-Left is n,n; Bottom-Right is 1,1)
+      const rowNum = isWhite ? n - i : i + 1;
+      const rowStr = String(rowNum);
+      const actualRow = isWhite ? n - 1 - i : i;
+      const isRowActive = actualRow === lastRow;
+
+      ctx.fillStyle = isRowActive ? '#d97706' : '#221408';
       ctx.font = isRowActive
-        ? `bold ${Math.max(15, Math.round(26 * (19 / n)))}px "Segoe UI", system-ui, sans-serif`
-        : `600 ${Math.max(13, Math.round(22 * (19 / n)))}px "Segoe UI", system-ui, sans-serif`;
+        ? `bold ${Math.max(16, Math.round(28 * (19 / n)))}px "Segoe UI", -apple-system, system-ui, sans-serif`
+        : `700 ${Math.max(14, Math.round(24 * (19 / n)))}px "Segoe UI", -apple-system, system-ui, sans-serif`;
 
-      ctx.fillText(numStr, center - gridExtent / 2 - pad, pos);
-      ctx.fillText(numStr, center + gridExtent / 2 + pad, pos);
+      ctx.fillText(rowStr, center - gridExtent / 2 - pad, pos);
+      ctx.fillText(rowStr, center + gridExtent / 2 + pad, pos);
     }
     texture.update(false);
   }
@@ -642,8 +689,12 @@ export class Board3D {
     );
   }
 
-  private worldCoordinate(position: number): number {
-    return (position - (this.size - 1) / 2) * SPACING;
+  private worldCoordinateX(col: number): number {
+    return (col - (this.size - 1) / 2) * SPACING;
+  }
+
+  private worldCoordinateZ(row: number): number {
+    return ((this.size - 1) / 2 - row) * SPACING;
   }
 
   private createPieceNode(rank: number, color: number, index: number, dead: boolean): TransformNode {
@@ -938,7 +989,7 @@ export class Board3D {
       const n = this.size;
       const half = (n - 1) / 2;
       const col = Math.round(point.x / SPACING + half);
-      const row = Math.round(point.z / SPACING + half);
+      const row = Math.round(half - point.z / SPACING);
       if (col < 0 || col >= n || row < 0 || row >= n) {
         if (lastHoverIndex !== null) {
           lastHoverIndex = null;
@@ -948,8 +999,8 @@ export class Board3D {
         return;
       }
 
-      const x = (col - half) * SPACING;
-      const z = (row - half) * SPACING;
+      const x = this.worldCoordinateX(col);
+      const z = this.worldCoordinateZ(row);
       if (Math.hypot(point.x - x, point.z - z) > SPACING * 0.5) {
         if (lastHoverIndex !== null) {
           lastHoverIndex = null;
@@ -984,7 +1035,7 @@ export class Board3D {
     const n = this.size;
     const row = Math.floor(index / n);
     const col = index % n;
-    this.hoverMarker.position.set(this.worldCoordinate(col), 0.028, this.worldCoordinate(row));
+    this.hoverMarker.position.set(this.worldCoordinateX(col), 0.028, this.worldCoordinateZ(row));
     this.hoverMarker.isVisible = true;
   }
 
@@ -997,11 +1048,11 @@ export class Board3D {
     const n = this.size;
     const half = (n - 1) / 2;
     const col = Math.round(point.x / SPACING + half);
-    const row = Math.round(point.z / SPACING + half);
+    const row = Math.round(half - point.z / SPACING);
     if (col < 0 || col >= n || row < 0 || row >= n) return;
 
-    const x = (col - half) * SPACING;
-    const z = (row - half) * SPACING;
+    const x = this.worldCoordinateX(col);
+    const z = this.worldCoordinateZ(row);
     if (Math.hypot(point.x - x, point.z - z) > SPACING * 0.5) return;
 
     this.clickHandler(row * n + col);
