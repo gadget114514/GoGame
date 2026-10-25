@@ -3,8 +3,10 @@ import {
   ArcRotateCamera,
   Color3,
   Color4,
+  CubicEase,
   DirectionalLight,
   DynamicTexture,
+  EasingFunction,
   Engine,
   HemisphericLight,
   Mesh,
@@ -539,12 +541,25 @@ export class Board3D {
           existing.rank !== rank ||
           existing.dead !== dead
         ) {
+          const wasExisting = !!existing;
           existing?.root.dispose();
           const root = this.createPieceNode(rank, color, index, dead);
           const row = Math.floor(index / n);
           const col = index % n;
-          root.position.set(this.worldCoordinateX(col), 0.03, this.worldCoordinateZ(row));
-          this.animateDrop(root);
+          const targetX = this.worldCoordinateX(col);
+          const targetZ = this.worldCoordinateZ(row);
+          const targetY = 0.03;
+          root.position.set(targetX, targetY, targetZ);
+
+          const isJustPlaced = isNewMove && index === state.goban.lastMove && !wasExisting;
+          if (isJustPlaced) {
+            this.animatePlacement(root, targetY, () => {
+              const pieceColor = color === WHITE ? WHITE_MOVE_COLOR : BLACK_MOVE_COLOR;
+              this.spawnBurst(new Vector3(targetX, 0.16, targetZ), pieceColor, 48, 2.6);
+              this.lastMovePulseAt = performance.now();
+            });
+          }
+
           this.pieces.set(index, { root, rank, color, dead });
         }
       } else if (existing) {
@@ -598,7 +613,6 @@ export class Board3D {
 
     if (isNewMove) {
       this.lastMovePulseAt = performance.now();
-      this.spawnBurst(new Vector3(x, 0.18, z), color, 72, 3.4);
     }
   }
 
@@ -807,25 +821,87 @@ export class Board3D {
     head.isPickable = false;
   }
 
-  private animateDrop(root: TransformNode): void {
+  private animatePlacement(root: TransformNode, targetY: number, onComplete?: () => void): void {
     try {
-      const targetY = root.position.y;
-      root.position.y = targetY + 2.2;
-      const animation = new Animation(
-        'drop',
+      const startY = targetY + 3.4;
+      root.position.y = startY;
+
+      // Position animation: smoothly descends from above (0.55s) with a gentle settle
+      const animY = new Animation(
+        'piecePlacementY',
         'position.y',
         60,
         Animation.ANIMATIONTYPE_FLOAT,
         Animation.ANIMATIONLOOPMODE_CONSTANT
       );
-      animation.setKeys([
-        { frame: 0, value: targetY + 2.2 },
-        { frame: 10, value: targetY }
+
+      // 34 frames at 60fps = 0.567 seconds
+      animY.setKeys([
+        { frame: 0, value: startY },
+        { frame: 28, value: targetY },
+        { frame: 31, value: targetY + 0.04 },
+        { frame: 34, value: targetY }
       ]);
-      root.animations.push(animation);
-      this.scene.beginAnimation(root, 0, 10, false);
+
+      const ease = new CubicEase();
+      ease.setEasingMode(EasingFunction.EASINGMODE_EASEOUT);
+      animY.setEasingFunction(ease);
+
+      // Scaling animation: starts slightly compact and blooms into full size
+      const origScaleX = root.scaling.x;
+      const origScaleY = root.scaling.y;
+      const origScaleZ = root.scaling.z;
+
+      root.scaling.set(origScaleX * 0.82, origScaleY * 0.82, origScaleZ * 0.82);
+
+      const animScaleX = new Animation(
+        'piecePlacementScaleX',
+        'scaling.x',
+        60,
+        Animation.ANIMATIONTYPE_FLOAT,
+        Animation.ANIMATIONLOOPMODE_CONSTANT
+      );
+      animScaleX.setKeys([
+        { frame: 0, value: origScaleX * 0.82 },
+        { frame: 28, value: origScaleX }
+      ]);
+      animScaleX.setEasingFunction(ease);
+
+      const animScaleY = new Animation(
+        'piecePlacementScaleY',
+        'scaling.y',
+        60,
+        Animation.ANIMATIONTYPE_FLOAT,
+        Animation.ANIMATIONLOOPMODE_CONSTANT
+      );
+      animScaleY.setKeys([
+        { frame: 0, value: origScaleY * 0.82 },
+        { frame: 28, value: origScaleY }
+      ]);
+      animScaleY.setEasingFunction(ease);
+
+      const animScaleZ = new Animation(
+        'piecePlacementScaleZ',
+        'scaling.z',
+        60,
+        Animation.ANIMATIONTYPE_FLOAT,
+        Animation.ANIMATIONLOOPMODE_CONSTANT
+      );
+      animScaleZ.setKeys([
+        { frame: 0, value: origScaleZ * 0.82 },
+        { frame: 28, value: origScaleZ }
+      ]);
+      animScaleZ.setEasingFunction(ease);
+
+      root.animations = [animY, animScaleX, animScaleY, animScaleZ];
+      this.scene.beginAnimation(root, 0, 34, false, 1.0, () => {
+        root.position.y = targetY;
+        root.scaling.set(origScaleX, origScaleY, origScaleZ);
+        onComplete?.();
+      });
     } catch {
-      // Animation is purely cosmetic.
+      root.position.y = targetY;
+      onComplete?.();
     }
   }
 

@@ -685,7 +685,12 @@ export class GameController {
     this.hoverCache.clear();
 
     try {
+      const startTime = performance.now();
       const { move, evaluation } = await this.engine.chooseMove(this.goban, this.level);
+      const elapsed = performance.now() - startTime;
+      if (elapsed < 280) {
+        await new Promise((resolve) => setTimeout(resolve, 280 - elapsed));
+      }
 
       // Record evaluation for the move prior to AI turn (the player's move)
       const prevSnapIndex = this.goban.moves.length;

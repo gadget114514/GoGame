@@ -18,6 +18,9 @@ export class Board2D {
   private hoverIndex: number | null = null;
   private perspective: 'black' | 'white' = 'black';
 
+  private prevMoveCount = 0;
+  private lastMoveAnimStartTime = 0;
+
   constructor(private readonly canvas: HTMLCanvasElement) {
     const context = canvas.getContext('2d');
     if (!context) throw new Error('2D canvas is not supported');
@@ -59,6 +62,10 @@ export class Board2D {
   };
 
   update(goban: Goban, evaluation: Evaluation | null): void {
+    if (goban.moves.length === this.prevMoveCount + 1 && goban.lastMove !== null) {
+      this.lastMoveAnimStartTime = performance.now();
+    }
+    this.prevMoveCount = goban.moves.length;
     this.goban = goban;
     this.evaluation = evaluation;
     if (goban.size !== this.size) {
@@ -223,13 +230,28 @@ export class Board2D {
         ctx.strokeRect(x - size / 2, y - size / 2, size, size);
         continue;
       }
+
+      let currentRadius = radius;
+      const isJustPlaced = index === last && this.lastMoveAnimStartTime > 0;
+      let animProgress = 1;
+      if (isJustPlaced) {
+        const elapsed = performance.now() - this.lastMoveAnimStartTime;
+        if (elapsed < 480) {
+          animProgress = elapsed / 480;
+          const scale = 1.0 + 0.4 * Math.pow(1 - animProgress, 2);
+          currentRadius = radius * scale;
+        } else {
+          this.lastMoveAnimStartTime = 0;
+        }
+      }
+
       const gradient = ctx.createRadialGradient(
-        x - radius * 0.3,
-        y - radius * 0.3,
-        radius * 0.15,
+        x - currentRadius * 0.3,
+        y - currentRadius * 0.3,
+        currentRadius * 0.15,
         x,
         y,
-        radius
+        currentRadius
       );
       if (color === BLACK) {
         gradient.addColorStop(0, '#4a4a55');
@@ -239,12 +261,22 @@ export class Board2D {
         gradient.addColorStop(1, '#cfc8ba');
       }
       ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.arc(x, y, currentRadius, 0, Math.PI * 2);
       ctx.fillStyle = gradient;
       ctx.fill();
       ctx.strokeStyle = color === BLACK ? 'rgba(0,0,0,0.6)' : 'rgba(120,110,95,0.8)';
       ctx.lineWidth = Math.max(1, this.cell * 0.02);
       ctx.stroke();
+
+      if (isJustPlaced && animProgress < 1) {
+        const rippleR = radius + this.cell * 0.65 * animProgress;
+        const rippleAlpha = (1 - animProgress) * 0.75;
+        ctx.beginPath();
+        ctx.arc(x, y, rippleR, 0, Math.PI * 2);
+        ctx.strokeStyle = color === BLACK ? `rgba(217, 160, 102, ${rippleAlpha})` : `rgba(180, 210, 245, ${rippleAlpha})`;
+        ctx.lineWidth = Math.max(1.5, this.cell * 0.04);
+        ctx.stroke();
+      }
     }
 
     // Last move marker.
@@ -280,6 +312,10 @@ export class Board2D {
       ctx.strokeStyle = '#f59e0b';
       ctx.lineWidth = Math.max(1.5, this.cell * 0.04);
       ctx.stroke();
+    }
+
+    if (this.lastMoveAnimStartTime > 0 && performance.now() - this.lastMoveAnimStartTime < 480) {
+      requestAnimationFrame(() => this.render());
     }
   }
 
