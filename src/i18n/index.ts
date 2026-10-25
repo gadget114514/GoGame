@@ -3,8 +3,10 @@ export type Language = 'en' | 'ja' | 'es';
 export interface Translations {
   board: string;
   ai: string;
+  opponent: string;
   dan: string;
   kyu: string;
+  manual: string;
   pieces: string;
   pieceClayfoot: string;
   pieceDarkYagami: string;
@@ -80,8 +82,10 @@ const DICTIONARIES: Record<Language, Translations> = {
   en: {
     board: 'Board',
     ai: 'AI',
-    dan: 'Dan',
-    kyu: 'Kyu',
+    opponent: 'Opponent',
+    dan: 'KataGo (Dan)',
+    kyu: 'KataGo (Kyu)',
+    manual: 'Manual (2P)',
     pieces: 'Pieces',
     pieceClayfoot: 'Clayfoot Studios',
     pieceDarkYagami: 'Dark Yagami',
@@ -155,8 +159,10 @@ const DICTIONARIES: Record<Language, Translations> = {
   ja: {
     board: '盤面',
     ai: 'AI',
-    dan: '有段',
-    kyu: '級位',
+    opponent: '相手',
+    dan: 'KataGo (有段)',
+    kyu: 'KataGo (級位)',
+    manual: 'マニュアル (対人)',
     pieces: '駒・碁石',
     pieceClayfoot: 'Clayfoot Studios',
     pieceDarkYagami: 'Dark Yagami',
@@ -230,8 +236,10 @@ const DICTIONARIES: Record<Language, Translations> = {
   es: {
     board: 'Tablero',
     ai: 'IA',
-    dan: 'Dan',
-    kyu: 'Kyu',
+    opponent: 'Oponente',
+    dan: 'KataGo (Dan)',
+    kyu: 'KataGo (Kyu)',
+    manual: 'Manual (2J)',
     pieces: 'Piezas',
     pieceClayfoot: 'Clayfoot Studios',
     pieceDarkYagami: 'Dark Yagami',

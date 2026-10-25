@@ -67,6 +67,8 @@ function requireElement<T extends HTMLElement>(id: string): T {
   return element as T;
 }
 
+export type OpponentMode = 'dan' | 'kyu' | 'manual';
+
 export class GameController {
   private readonly engine = new KataGoEngine();
   private readonly board3d: Board3D;
@@ -75,13 +77,21 @@ export class GameController {
   private readonly els: Elements;
 
   private goban: Goban;
-  private level: AILevel = 'dan';
+  private opponent: OpponentMode = 'dan';
   private playerSide: 'black' | 'white' = 'black';
   private view: ViewMode = '3d';
   private evaluation: Evaluation | null = null;
   private busy = false;
   private gameOver = false;
   private evaluationToken = 0;
+
+  private get level(): AILevel {
+    return this.opponent === 'kyu' ? 'kyu' : 'dan';
+  }
+
+  private isManualMode(): boolean {
+    return this.opponent === 'manual';
+  }
 
   private hoverEvalEnabled = true;
   private hoverIndex: number | null = null;
@@ -142,7 +152,14 @@ export class GameController {
     const komi = this.readKomi(size);
     this.goban = new Goban(size, komi);
 
-    this.level = this.els.aiLevel.value === 'kyu' ? 'kyu' : 'dan';
+    const savedOpponent = localStorage.getItem('gogame:aiLevel') as OpponentMode;
+    if (savedOpponent === 'kyu' || savedOpponent === 'manual' || savedOpponent === 'dan') {
+      this.opponent = savedOpponent;
+      this.els.aiLevel.value = savedOpponent;
+    } else {
+      const initial = this.els.aiLevel.value;
+      this.opponent = initial === 'kyu' || initial === 'manual' ? initial : 'dan';
+    }
 
     const savedSide = (localStorage.getItem('gogame:playerSide') as 'black' | 'white') || 'black';
     this.playerSide = savedSide;
@@ -205,7 +222,7 @@ export class GameController {
     try {
       await this.engine.initialize();
       await this.refreshEvaluation(true);
-      if (this.playerSide === 'white' && this.goban.moves.length === 0) {
+      if (this.playerSide === 'white' && this.goban.moves.length === 0 && !this.isManualMode()) {
         await this.aiTurn();
       }
     } catch (error) {
@@ -253,9 +270,16 @@ export class GameController {
       this.setEvalGraphEnabled(this.els.toggleEvalGraph.checked);
     });
     this.els.aiLevel.addEventListener('change', () => {
-      this.level = this.els.aiLevel.value === 'kyu' ? 'kyu' : 'dan';
+      const val = this.els.aiLevel.value;
+      this.opponent = val === 'kyu' || val === 'manual' ? val : 'dan';
+      localStorage.setItem('gogame:aiLevel', this.opponent);
       this.hoverCache.clear();
-      void this.refreshEvaluation(true);
+      this.updateStatus();
+      if (!this.isManualMode() && this.goban.moves.length === 0 && this.playerSide === 'white' && !this.busy) {
+        void this.aiTurn();
+      } else {
+        void this.refreshEvaluation(true);
+      }
     });
     this.els.komi.addEventListener('change', () => {
       this.goban.komi = this.readKomi(this.goban.size);
@@ -356,7 +380,7 @@ export class GameController {
     this.board3d.setPerspective(side);
     this.board2d.setPerspective(side);
     this.updateStatus();
-    if (this.goban.moves.length === 0 && side === 'white' && !this.busy) {
+    if (this.goban.moves.length === 0 && side === 'white' && !this.busy && !this.isManualMode()) {
       void this.aiTurn();
     }
   }
@@ -377,7 +401,7 @@ export class GameController {
     this.render();
     this.updateStatus();
     void this.refreshEvaluation(true);
-    if (this.playerSide === 'white') {
+    if (this.playerSide === 'white' && !this.isManualMode()) {
       void this.aiTurn();
     }
   }
@@ -400,7 +424,7 @@ export class GameController {
     this.render();
     this.updateStatus();
     void this.refreshEvaluation(true);
-    if (this.playerSide === 'white') {
+    if (this.playerSide === 'white' && !this.isManualMode()) {
       void this.aiTurn();
     }
   }
@@ -592,8 +616,10 @@ export class GameController {
     }
 
     if (this.gameOver) return;
-    const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
-    if (this.goban.side !== humanColor) return;
+    if (!this.isManualMode()) {
+      const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
+      if (this.goban.side !== humanColor) return;
+    }
     if (!this.goban.play(index)) return;
 
     this.clearHover();
@@ -606,7 +632,13 @@ export class GameController {
     this.render();
     this.updateStatus();
     this.checkGameOver();
-    if (!this.gameOver) await this.aiTurn();
+    if (!this.gameOver) {
+      if (!this.isManualMode()) {
+        await this.aiTurn();
+      } else {
+        await this.refreshEvaluation(false);
+      }
+    }
   }
 
   private async humanPass(): Promise<void> {
@@ -620,8 +652,10 @@ export class GameController {
     }
 
     if (this.gameOver) return;
-    const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
-    if (this.goban.side !== humanColor) return;
+    if (!this.isManualMode()) {
+      const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
+      if (this.goban.side !== humanColor) return;
+    }
 
     this.clearHover();
     this.hoverCache.clear();
@@ -634,7 +668,13 @@ export class GameController {
     this.render();
     this.updateStatus();
     this.checkGameOver();
-    if (!this.gameOver) await this.aiTurn();
+    if (!this.gameOver) {
+      if (!this.isManualMode()) {
+        await this.aiTurn();
+      } else {
+        await this.refreshEvaluation(false);
+      }
+    }
   }
 
   private async aiTurn(): Promise<void> {
@@ -710,13 +750,17 @@ export class GameController {
 
     if (this.currentHistoryIndex <= 0) return;
 
-    const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
     let targetIndex = this.currentHistoryIndex;
-    let undone = 0;
-    while (targetIndex > 0 && undone < 2) {
-      targetIndex--;
-      undone++;
-      if (this.history[targetIndex].side === humanColor) break;
+    if (this.isManualMode()) {
+      targetIndex = Math.max(0, this.currentHistoryIndex - 1);
+    } else {
+      const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
+      let undone = 0;
+      while (targetIndex > 0 && undone < 2) {
+        targetIndex--;
+        undone++;
+        if (this.history[targetIndex].side === humanColor) break;
+      }
     }
 
     this.history = this.history.slice(0, targetIndex + 1);
@@ -759,10 +803,12 @@ export class GameController {
       return;
     }
 
-    const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
-    if (this.goban.side !== humanColor) {
-      if (this.hoverIndex !== null) this.clearHover();
-      return;
+    if (!this.isManualMode()) {
+      const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
+      if (this.goban.side !== humanColor) {
+        if (this.hoverIndex !== null) this.clearHover();
+        return;
+      }
     }
 
     if (index === null || this.goban.at(index) !== 0 || !this.goban.legal(index)) {
@@ -926,8 +972,12 @@ export class GameController {
     }
 
     const today = new Date().toISOString().split('T')[0];
-    const pb = this.playerSide === 'black' ? 'Human (Black)' : `KataGo AI (${this.level.toUpperCase()})`;
-    const pw = this.playerSide === 'white' ? 'Human (White)' : `KataGo AI (${this.level.toUpperCase()})`;
+    let pb = 'Human (Black)';
+    let pw = 'Human (White)';
+    if (!this.isManualMode()) {
+      pb = this.playerSide === 'black' ? 'Human (Black)' : `KataGo AI (${this.level.toUpperCase()})`;
+      pw = this.playerSide === 'white' ? 'Human (White)' : `KataGo AI (${this.level.toUpperCase()})`;
+    }
     const sgfText = generateSGF(this.goban, {
       blackPlayer: pb,
       whitePlayer: pw,

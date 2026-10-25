@@ -6,16 +6,22 @@ describe('i18n localization', () => {
     setLanguage('en');
     expect(t('newGame')).toBe('New');
     expect(t('black')).toBe('Black');
+    expect(t('opponent')).toBe('Opponent');
+    expect(t('manual')).toBe('Manual (2P)');
     expect(t('turnToPlay', { side: 'Black', move: 5 })).toBe('Black to play · move 5');
 
     setLanguage('ja');
     expect(t('newGame')).toBe('対局開始');
     expect(t('black')).toBe('黒');
+    expect(t('opponent')).toBe('相手');
+    expect(t('manual')).toBe('マニュアル (対人)');
     expect(t('turnToPlay', { side: '黒', move: 5 })).toBe('黒の手番 · 5手目');
 
     setLanguage('es');
     expect(t('newGame')).toBe('Nueva');
     expect(t('black')).toBe('Negras');
+    expect(t('opponent')).toBe('Oponente');
+    expect(t('manual')).toBe('Manual (2J)');
     expect(t('turnToPlay', { side: 'Negras', move: 5 })).toBe('Negras para jugar · jugada 5');
   });
 
