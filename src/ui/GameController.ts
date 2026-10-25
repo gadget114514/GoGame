@@ -1022,6 +1022,11 @@ export class GameController {
   private async loadSGF(): Promise<void> {
     const file = this.els.file.files?.[0];
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      console.warn('SGF file rejected: exceeds 5MB limit');
+      this.els.turn.textContent = t('invalidSgf');
+      return;
+    }
     this.stopReplay();
     this.clearHover();
     this.hoverCache.clear();

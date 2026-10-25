@@ -135,18 +135,22 @@ export function parseSGF(sgfText: string): SGFGame {
   };
 }
 
+export function escapeSGFText(val: string): string {
+  return val.replace(/\\/g, '\\\\').replace(/\]/g, '\\]');
+}
+
 /**
  * Generates an SGF string from a Goban state and optional metadata.
  */
 export function generateSGF(goban: Goban, metadata: SGFMetadata = {}): string {
-  const dateStr = metadata.date || new Date().toISOString().split('T')[0];
-  const pb = metadata.blackPlayer || 'Human (Black)';
-  const pw = metadata.whitePlayer || 'KataGo AI (White)';
-  const ru = metadata.rules || 'Chinese';
+  const dateStr = escapeSGFText(metadata.date || new Date().toISOString().split('T')[0]);
+  const pb = escapeSGFText(metadata.blackPlayer || 'Human (Black)');
+  const pw = escapeSGFText(metadata.whitePlayer || 'KataGo AI (White)');
+  const ru = escapeSGFText(metadata.rules || 'Chinese');
 
   let header = `(;GM[1]FF[4]CA[UTF-8]AP[GoGame3D:1.0]SZ[${goban.size}]KM[${goban.komi}]RU[${ru}]PB[${pb}]PW[${pw}]DT[${dateStr}]`;
   if (metadata.result) {
-    header += `RE[${metadata.result}]`;
+    header += `RE[${escapeSGFText(metadata.result)}]`;
   }
 
   let body = '';

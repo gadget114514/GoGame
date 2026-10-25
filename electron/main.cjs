@@ -76,8 +76,33 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true
     }
+  });
+
+  // Block unauthorized popups and new windows
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
+  // Prevent unwanted in-window navigation away from the local app
+  win.webContents.on('will-navigate', (event, navigationUrl) => {
+    try {
+      const parsed = new URL(navigationUrl);
+      const isAllowedOrigin =
+        parsed.origin === 'app://bundle' ||
+        parsed.origin === 'http://localhost:5173' ||
+        parsed.origin === 'http://127.0.0.1:5173';
+      if (!isAllowedOrigin) {
+        event.preventDefault();
+      }
+    } catch {
+      event.preventDefault();
+    }
+  });
+
+  // Deny sensitive device permission requests by default
+  win.webContents.session.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false);
   });
 
   if (useBundle) {

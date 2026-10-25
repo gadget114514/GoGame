@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BLACK, WHITE, Goban } from '../src/game/Goban';
-import { generateSGF, parseSGF, indexToSGFCoord, sgfCoordToIndex } from '../src/game/sgf';
+import { generateSGF, parseSGF, indexToSGFCoord, sgfCoordToIndex, escapeSGFText } from '../src/game/Sgf';
 
 describe('SGF Parser and Generator', () => {
   it('converts between board index and SGF coordinates', () => {
@@ -83,5 +83,20 @@ describe('SGF Parser and Generator', () => {
       move: null,
       comment: 'Black passes with tt'
     });
+  });
+
+  it('properly escapes brackets and backslashes in SGF metadata to prevent injection', () => {
+    expect(escapeSGFText('Player [Dan\\]')).toBe('Player [Dan\\\\\\\]');
+
+    const goban = new Goban(19, 7.5);
+    const sgf = generateSGF(goban, {
+      blackPlayer: 'Malicious]PW[FakePlayer',
+      whitePlayer: 'KataGo\\AI',
+      result: 'B+R]'
+    });
+
+    expect(sgf).toContain('PB[Malicious\\]PW[FakePlayer]');
+    expect(sgf).toContain('PW[KataGo\\\\AI]');
+    expect(sgf).toContain('RE[B+R\\]]');
   });
 });

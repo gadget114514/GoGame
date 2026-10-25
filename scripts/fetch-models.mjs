@@ -53,7 +53,11 @@ for (const source of config.sources ?? []) {
     for (const shard of group.paths ?? []) shards.add(shard);
   }
   for (const shard of shards) {
-    await download(base + shard, path.join(directory, shard));
+    const shardTarget = path.resolve(directory, shard);
+    if (!shardTarget.startsWith(directory + path.sep)) {
+      throw new Error(`Security error: shard path escapes model directory: ${shard}`);
+    }
+    await download(base + shard, shardTarget);
   }
   try {
     await download(base + 'metadata.json', path.join(directory, 'metadata.json'));
