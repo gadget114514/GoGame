@@ -44,6 +44,10 @@
             <input id="toggle-hover-eval" type="checkbox" checked />
             <span data-i18n="hoverEval">Hover Eval</span>
           </label>
+          <label class="toggle-control" id="label-eval-graph" title="Evaluation graph">
+            <input id="toggle-eval-graph" type="checkbox" checked />
+            <span data-i18n="evalGraph">Eval Graph</span>
+          </label>
           <label><span data-i18n="language">Language</span>
             <select id="language-select">
               <option value="en">English</option>
@@ -104,6 +108,22 @@
         <div id="thinking" class="overlay" hidden><span class="spinner"></span> <span data-i18n="thinking">Thinking…</span></div>
         <div id="boot" class="overlay" data-i18n="bootLoading">Loading KataGo model…</div>
       </main>
+
+      <section id="eval-graph-panel" class="eval-graph-panel" aria-label="Evaluation Graph">
+        <div class="eval-graph-header">
+          <div class="eval-graph-title-group">
+            <span class="eval-graph-title" data-i18n="evalGraphTitle">AI Evaluation Graph</span>
+            <span id="eval-graph-info" class="eval-graph-info"></span>
+          </div>
+          <div class="eval-graph-controls">
+            <button id="btn-graph-mode" class="graph-btn" title="Toggle Winrate / Score Lead" data-i18n="evalGraphModeWinrate">Win Rate %</button>
+            <button id="btn-close-graph" class="graph-btn graph-close-btn" title="Close evaluation graph" aria-label="Close">&times;</button>
+          </div>
+        </div>
+        <div class="eval-graph-body">
+          <canvas id="eval-graph-canvas"></canvas>
+        </div>
+      </section>
 
       <footer id="status">
         <span id="turn">Black to play</span>

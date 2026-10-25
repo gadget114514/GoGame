@@ -6,6 +6,7 @@ import { Board3D, type PieceStyle, type RenderState } from './Board3D';
 import { Board2D } from './Board2D';
 import { detectInitialLanguage, setLanguage, t, type Language } from '../i18n';
 import { generateSGF, parseSGF } from '../game/sgf';
+import { EvalGraph, type EvalPoint } from './EvalGraph';
 
 interface Elements {
   canvas3d: HTMLCanvasElement;
@@ -16,6 +17,7 @@ interface Elements {
   pieceStyle: HTMLSelectElement;
   languageSelect: HTMLSelectElement;
   toggleHoverEval: HTMLInputElement;
+  toggleEvalGraph: HTMLInputElement;
   komi: HTMLInputElement;
   newGame: HTMLButtonElement;
   pass: HTMLButtonElement;
@@ -38,6 +40,12 @@ interface Elements {
   replaySlider: HTMLInputElement;
   replayCounter: HTMLElement;
   replaySpeed: HTMLSelectElement;
+
+  evalGraphPanel: HTMLElement;
+  evalGraphInfo: HTMLElement;
+  btnGraphMode: HTMLButtonElement;
+  btnCloseGraph: HTMLButtonElement;
+  evalGraphCanvas: HTMLCanvasElement;
 }
 
 interface HistorySnapshot {
@@ -48,6 +56,7 @@ interface HistorySnapshot {
   moves: MoveRecord[];
   moveRecord: MoveRecord | null;
   comment?: string;
+  evalPoint?: EvalPoint | null;
 }
 
 type ViewMode = '3d' | '2d';
@@ -62,6 +71,7 @@ export class GameController {
   private readonly engine = new KataGoEngine();
   private readonly board3d: Board3D;
   private readonly board2d: Board2D;
+  private readonly evalGraph: EvalGraph;
   private readonly els: Elements;
 
   private goban: Goban;
@@ -79,6 +89,10 @@ export class GameController {
   private hoverToken = 0;
   private hoverCache = new Map<string, Evaluation>();
 
+  private evalGraphEnabled = true;
+  private bgEvalTimer: number | null = null;
+  private bgEvalActive = false;
+
   private history: HistorySnapshot[] = [];
   private currentHistoryIndex = 0;
   private isPlayingReplay = false;
@@ -95,6 +109,7 @@ export class GameController {
       pieceStyle: requireElement('piece-style'),
       languageSelect: requireElement('language-select'),
       toggleHoverEval: requireElement('toggle-hover-eval'),
+      toggleEvalGraph: requireElement('toggle-eval-graph'),
       komi: requireElement('komi'),
       newGame: requireElement('btn-new'),
       pass: requireElement('btn-pass'),
@@ -115,7 +130,12 @@ export class GameController {
       btnLast: requireElement('btn-last'),
       replaySlider: requireElement('replay-slider'),
       replayCounter: requireElement('replay-counter'),
-      replaySpeed: requireElement('replay-speed')
+      replaySpeed: requireElement('replay-speed'),
+      evalGraphPanel: requireElement('eval-graph-panel'),
+      evalGraphInfo: requireElement('eval-graph-info'),
+      btnGraphMode: requireElement('btn-graph-mode'),
+      btnCloseGraph: requireElement('btn-close-graph'),
+      evalGraphCanvas: requireElement('eval-graph-canvas')
     };
 
     const size = this.readBoardSize();
@@ -134,6 +154,9 @@ export class GameController {
     this.hoverEvalEnabled = localStorage.getItem('gogame:hoverEval') !== 'false';
     this.els.toggleHoverEval.checked = this.hoverEvalEnabled;
 
+    this.evalGraphEnabled = localStorage.getItem('gogame:evalGraph') !== 'false';
+    this.els.toggleEvalGraph.checked = this.evalGraphEnabled;
+
     const initialLang = detectInitialLanguage();
     setLanguage(initialLang);
     this.els.languageSelect.value = initialLang;
@@ -142,6 +165,17 @@ export class GameController {
 
     this.board3d = new Board3D(this.els.canvas3d);
     this.board2d = new Board2D(this.els.canvas2d);
+    this.evalGraph = new EvalGraph(
+      this.els.evalGraphCanvas,
+      this.els.evalGraphPanel,
+      this.els.evalGraphInfo,
+      this.els.btnGraphMode,
+      this.els.btnCloseGraph
+    );
+    this.evalGraph.onSelectMove((step) => this.goToStep(step));
+    this.evalGraph.onVisibilityChange((visible) => this.setEvalGraphEnabled(visible));
+    this.setEvalGraphEnabled(this.evalGraphEnabled);
+
     this.board3d.setBoardSize(size);
     this.board3d.setPerspective(savedSide);
     void this.board3d.setPieceStyle(savedStyle);
@@ -215,6 +249,9 @@ export class GameController {
         this.clearHover();
       }
     });
+    this.els.toggleEvalGraph.addEventListener('change', () => {
+      this.setEvalGraphEnabled(this.els.toggleEvalGraph.checked);
+    });
     this.els.aiLevel.addEventListener('change', () => {
       this.level = this.els.aiLevel.value === 'kyu' ? 'kyu' : 'dan';
       this.hoverCache.clear();
@@ -280,8 +317,21 @@ export class GameController {
       if (key) el.title = t(key);
     });
     this.els.btnPlay.title = this.isPlayingReplay ? t('pause') : t('play');
+    this.evalGraph.updateLanguage();
     this.updateViewButtonText();
     this.updateStatus();
+  }
+
+  private setEvalGraphEnabled(enabled: boolean): void {
+    this.evalGraphEnabled = enabled;
+    localStorage.setItem('gogame:evalGraph', String(enabled));
+    this.els.toggleEvalGraph.checked = enabled;
+    this.evalGraph.setVisible(enabled);
+    this.board3d.resize();
+    this.board2d.resize();
+    if (enabled) {
+      this.scheduleBackgroundEvaluation();
+    }
   }
 
   private updateViewButtonText(): void {
@@ -370,6 +420,7 @@ export class GameController {
 
   private resetHistory(): void {
     this.stopReplay();
+    this.cancelBackgroundEvaluation();
     this.history = [
       {
         board: new Uint8Array(this.goban.board),
@@ -377,14 +428,16 @@ export class GameController {
         ko: this.goban.ko,
         lastMove: this.goban.lastMove,
         moves: [],
-        moveRecord: null
+        moveRecord: null,
+        evalPoint: null
       }
     ];
     this.currentHistoryIndex = 0;
+    this.evalGraph.clear();
     this.updateReplayUI();
   }
 
-  private recordSnapshot(record: MoveRecord | null, comment?: string): void {
+  private recordSnapshot(record: MoveRecord | null, comment?: string, evalPoint?: EvalPoint | null): void {
     const snapshot: HistorySnapshot = {
       board: new Uint8Array(this.goban.board),
       side: this.goban.side,
@@ -392,10 +445,16 @@ export class GameController {
       lastMove: this.goban.lastMove,
       moves: this.goban.moves.map((m) => ({ ...m })),
       moveRecord: record ? { ...record } : null,
-      comment
+      comment,
+      evalPoint: evalPoint ?? null
     };
     this.history.push(snapshot);
     this.currentHistoryIndex = this.history.length - 1;
+    this.evalGraph.setTotalMoves(this.history.length - 1);
+    this.evalGraph.setCurrentStep(this.currentHistoryIndex);
+    if (evalPoint) {
+      this.evalGraph.setPoint(evalPoint);
+    }
     this.updateReplayUI();
   }
 
@@ -459,6 +518,7 @@ export class GameController {
     this.isPlayingReplay = false;
     this.els.btnPlay.textContent = '▶';
     this.els.btnPlay.title = t('play');
+    this.scheduleBackgroundEvaluation();
   }
 
   private scheduleReplayTick(): void {
@@ -496,8 +556,13 @@ export class GameController {
     this.evaluation = null;
 
     this.updateReplayUI();
+    this.evalGraph.setCurrentStep(step);
     this.render();
     this.updateStatus();
+
+    if (!snapshot.evalPoint && !this.busy && !this.isPlayingReplay) {
+      void this.refreshEvaluation(false);
+    }
   }
 
   private updateReplayUI(): void {
@@ -522,6 +587,7 @@ export class GameController {
 
     if (this.currentHistoryIndex < this.history.length - 1) {
       this.history = this.history.slice(0, this.currentHistoryIndex + 1);
+      this.evalGraph.pruneAfter(this.currentHistoryIndex);
       this.restoreSnapshot(this.history[this.currentHistoryIndex]);
     }
 
@@ -549,6 +615,7 @@ export class GameController {
 
     if (this.currentHistoryIndex < this.history.length - 1) {
       this.history = this.history.slice(0, this.currentHistoryIndex + 1);
+      this.evalGraph.pruneAfter(this.currentHistoryIndex);
       this.restoreSnapshot(this.history[this.currentHistoryIndex]);
     }
 
@@ -579,6 +646,20 @@ export class GameController {
 
     try {
       const { move, evaluation } = await this.engine.chooseMove(this.goban, this.level);
+
+      // Record evaluation for the move prior to AI turn (the player's move)
+      const prevSnapIndex = this.goban.moves.length;
+      if (this.history[prevSnapIndex] && !this.history[prevSnapIndex].evalPoint) {
+        const prevPoint: EvalPoint = {
+          moveNum: prevSnapIndex,
+          winrate: evaluation.winrate,
+          scoreLead: evaluation.scoreLead,
+          color: this.history[prevSnapIndex].moveRecord?.color ?? 0
+        };
+        this.history[prevSnapIndex].evalPoint = prevPoint;
+        this.evalGraph.setPoint(prevPoint);
+      }
+
       if (move === null) {
         this.goban.pass();
       } else {
@@ -594,6 +675,19 @@ export class GameController {
         this.evaluation = await this.engine.evaluate(this.goban, this.level);
       } catch {
         this.evaluation = evaluation;
+      }
+
+      // Record evaluation for the AI move
+      const aiSnapIndex = this.history.length - 1;
+      if (this.history[aiSnapIndex]) {
+        const aiPoint: EvalPoint = {
+          moveNum: aiSnapIndex,
+          winrate: this.evaluation.winrate,
+          scoreLead: this.evaluation.scoreLead,
+          color: aiRecord.color
+        };
+        this.history[aiSnapIndex].evalPoint = aiPoint;
+        this.evalGraph.setPoint(aiPoint);
       }
 
       this.render();
@@ -626,6 +720,7 @@ export class GameController {
     }
 
     this.history = this.history.slice(0, targetIndex + 1);
+    this.evalGraph.pruneAfter(targetIndex);
     this.goToStep(targetIndex);
     this.gameOver = false;
     this.evaluation = null;
@@ -639,6 +734,16 @@ export class GameController {
       const evaluation = await this.engine.evaluate(this.goban, this.level);
       if (token !== this.evaluationToken) return;
       this.evaluation = evaluation;
+      const point: EvalPoint = {
+        moveNum: this.currentHistoryIndex,
+        winrate: evaluation.winrate,
+        scoreLead: evaluation.scoreLead,
+        color: this.history[this.currentHistoryIndex]?.moveRecord?.color ?? 0
+      };
+      if (this.history[this.currentHistoryIndex]) {
+        this.history[this.currentHistoryIndex].evalPoint = point;
+      }
+      this.evalGraph.setPoint(point);
       this.render();
       this.updateStatus();
     } catch (error) {
@@ -767,6 +872,7 @@ export class GameController {
         : `${t('turnToPlay', { side, move: this.goban.moves.length + 1 })}${whoseTurn}${lastInfo}${commentText}`;
 
     const activeEval = this.hoverEvaluation ?? this.evaluation;
+    const fallbackPoint = activeEval ? null : currentSnapshot?.evalPoint;
     if (activeEval) {
       const lead = activeEval.scoreLead;
       const label =
@@ -781,6 +887,15 @@ export class GameController {
         ? `[${t('preview')} ${this.formatIntersection(this.hoverIndex!)}] `
         : '';
       this.els.score.textContent = `${hoverPrefix}${label} · ${winLabel}${padded}`;
+    } else if (fallbackPoint) {
+      const lead = fallbackPoint.scoreLead;
+      const label =
+        Math.abs(lead) < 0.05
+          ? t('even')
+          : `${lead > 0 ? 'B' : 'W'} +${Math.abs(lead).toFixed(1)}`;
+      const win = fallbackPoint.winrate;
+      const winLabel = `${(win * 100).toFixed(0)}% B`;
+      this.els.score.textContent = `${label} · ${winLabel}`;
     } else {
       this.els.score.textContent = '';
     }
@@ -905,6 +1020,12 @@ export class GameController {
       this.restoreSnapshot(this.history[this.currentHistoryIndex]);
 
       this.evaluation = null;
+      this.cancelBackgroundEvaluation();
+      this.evalGraph.clear();
+      this.evalGraph.setTotalMoves(this.history.length - 1);
+      this.evalGraph.setCurrentStep(this.currentHistoryIndex);
+      this.scheduleBackgroundEvaluation();
+
       this.updateReplayUI();
       this.render();
       this.updateStatus();
@@ -916,6 +1037,75 @@ export class GameController {
       this.els.turn.textContent = t('invalidSgf');
     } finally {
       this.els.file.value = '';
+    }
+  }
+
+  private cancelBackgroundEvaluation(): void {
+    if (this.bgEvalTimer !== null) {
+      window.clearTimeout(this.bgEvalTimer);
+      this.bgEvalTimer = null;
+    }
+  }
+
+  private scheduleBackgroundEvaluation(): void {
+    this.cancelBackgroundEvaluation();
+    if (this.busy || this.isPlayingReplay || !this.evalGraphEnabled || this.bgEvalActive) {
+      return;
+    }
+    this.bgEvalTimer = window.setTimeout(() => void this.runBackgroundEvalStep(), 200);
+  }
+
+  private async runBackgroundEvalStep(): Promise<void> {
+    this.bgEvalTimer = null;
+    if (this.busy || this.isPlayingReplay || !this.evalGraphEnabled || this.bgEvalActive) {
+      return;
+    }
+
+    let targetIndex = -1;
+    if (this.history[this.currentHistoryIndex] && !this.history[this.currentHistoryIndex].evalPoint) {
+      targetIndex = this.currentHistoryIndex;
+    } else {
+      for (let i = 0; i < this.history.length; i++) {
+        if (!this.history[i].evalPoint) {
+          targetIndex = i;
+          break;
+        }
+      }
+    }
+
+    if (targetIndex === -1) return;
+
+    const snapshot = this.history[targetIndex];
+    if (!snapshot) return;
+
+    this.bgEvalActive = true;
+    try {
+      const tempGoban = new Goban(this.goban.size, this.goban.komi);
+      for (const m of snapshot.moves) {
+        if (m.move === null) tempGoban.pass();
+        else tempGoban.play(m.move);
+      }
+      const evaluation = await this.engine.evaluate(tempGoban, this.level);
+      if (this.history[targetIndex] === snapshot) {
+        const point: EvalPoint = {
+          moveNum: targetIndex,
+          winrate: evaluation.winrate,
+          scoreLead: evaluation.scoreLead,
+          color: snapshot.moveRecord?.color ?? 0
+        };
+        snapshot.evalPoint = point;
+        this.evalGraph.setPoint(point);
+        if (targetIndex === this.currentHistoryIndex) {
+          this.updateStatus();
+        }
+      }
+    } catch (err) {
+      console.debug('Background eval step skipped', err);
+    } finally {
+      this.bgEvalActive = false;
+      if (!this.busy && !this.isPlayingReplay && this.evalGraphEnabled) {
+        this.scheduleBackgroundEvaluation();
+      }
     }
   }
 }

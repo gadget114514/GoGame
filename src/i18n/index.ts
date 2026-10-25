@@ -65,6 +65,15 @@ export interface Translations {
   playerSide: string;
   sideBlack: string;
   sideWhite: string;
+  evalGraph: string;
+  evalGraphTitle: string;
+  evalGraphModeWinrate: string;
+  evalGraphModeLead: string;
+  evalGraphTooltip: string;
+  evalGraphNoData: string;
+  evalGraphEven: string;
+  blackWinShort: string;
+  whiteWinShort: string;
 }
 
 const DICTIONARIES: Record<Language, Translations> = {
@@ -132,7 +141,16 @@ const DICTIONARIES: Record<Language, Translations> = {
     lastMoveBtn: 'Last move',
     speed: 'Speed',
     replay: 'Replay',
-    sgfLoaded: 'Loaded SGF: {moves} moves'
+    sgfLoaded: 'Loaded SGF: {moves} moves',
+    evalGraph: 'Eval Graph',
+    evalGraphTitle: 'AI Evaluation Graph',
+    evalGraphModeWinrate: 'Win Rate %',
+    evalGraphModeLead: 'Score Lead pt',
+    evalGraphTooltip: 'Move {move}: {rate}% {side} · {lead}',
+    evalGraphNoData: 'Move {move}: (Unevaluated)',
+    evalGraphEven: 'Even',
+    blackWinShort: 'B',
+    whiteWinShort: 'W'
   },
   ja: {
     board: '盤面',
@@ -198,7 +216,16 @@ const DICTIONARIES: Record<Language, Translations> = {
     lastMoveBtn: '最後の手',
     speed: '速度',
     replay: '棋譜再生',
-    sgfLoaded: 'SGF読込完了: {moves}手'
+    sgfLoaded: 'SGF読込完了: {moves}手',
+    evalGraph: '評価値グラフ',
+    evalGraphTitle: 'AI評価値推移',
+    evalGraphModeWinrate: '勝率 %',
+    evalGraphModeLead: '目差 pt',
+    evalGraphTooltip: '{move}手目: {side}勝率 {rate}% · {lead}',
+    evalGraphNoData: '{move}手目: (評価値未計算)',
+    evalGraphEven: '互角',
+    blackWinShort: '黒',
+    whiteWinShort: '白'
   },
   es: {
     board: 'Tablero',
@@ -264,7 +291,16 @@ const DICTIONARIES: Record<Language, Translations> = {
     lastMoveBtn: 'Última jugada',
     speed: 'Velocidad',
     replay: 'Reproducir partida',
-    sgfLoaded: 'SGF cargado: {moves} jugadas'
+    sgfLoaded: 'SGF cargado: {moves} jugadas',
+    evalGraph: 'Gráfico de eval.',
+    evalGraphTitle: 'Gráfico de evaluación IA',
+    evalGraphModeWinrate: 'Prob. victoria %',
+    evalGraphModeLead: 'Ventaja pt',
+    evalGraphTooltip: 'Jugada {move}: {rate}% {side} · {lead}',
+    evalGraphNoData: 'Jugada {move}: (Sin evaluar)',
+    evalGraphEven: 'Igualado',
+    blackWinShort: 'N',
+    whiteWinShort: 'B'
   }
 };
 
