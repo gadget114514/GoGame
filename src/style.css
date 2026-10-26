@@ -242,6 +242,11 @@ canvas[hidden],
   border-radius: 2px;
 }
 
+#rank-legend .dead .cube.stone {
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f5f0e6, #b7a48f 72%);
+}
+
 .overlay {
   position: absolute;
   inset: 0;

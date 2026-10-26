@@ -68,6 +68,7 @@ export class Board2D {
   private size = 19;
   private goban: Goban | null = null;
   private evaluation: Evaluation | null = null;
+  private showHeatmap = true;
   private clickHandler: ((index: number) => void) | null = null;
   private hoverHandler: ((index: number | null) => void) | null = null;
   private hoverIndex: number | null = null;
@@ -121,13 +122,14 @@ export class Board2D {
     this.render();
   };
 
-  update(goban: Goban, evaluation: Evaluation | null): void {
+  update(goban: Goban, evaluation: Evaluation | null, showHeatmap = true): void {
     if (goban.moves.length === this.prevMoveCount + 1 && goban.lastMove !== null) {
       this.lastMoveAnimStartTime = performance.now();
     }
     this.prevMoveCount = goban.moves.length;
     this.goban = goban;
     this.evaluation = evaluation;
+    this.showHeatmap = showHeatmap;
     if (goban.size !== this.size) {
       this.size = goban.size;
       this.layout();
@@ -287,7 +289,7 @@ export class Board2D {
 
     // Ownership heat.
     const ownership = this.evaluation?.ownership;
-    if (ownership && this.goban && ownership.length >= this.goban.area) {
+    if (this.showHeatmap && ownership && this.goban && ownership.length >= this.goban.area) {
       for (let index = 0; index < this.goban.area; index++) {
         const row = Math.floor(index / this.size);
         const col = index % this.size;

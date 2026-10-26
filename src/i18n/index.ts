@@ -11,10 +11,15 @@ export interface Translations {
   pieceClayfoot: string;
   pieceDarkYagami: string;
   pieceStones: string;
+  deadStones: string;
+  deadCube: string;
+  deadStone: string;
   komi: string;
   language: string;
   hoverEval: string;
   hoverEvalTitle: string;
+  heatmap: string;
+  heatmapTitle: string;
   newGame: string;
   newGameTitle: string;
   pass: string;
@@ -91,6 +96,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     pieceClayfoot: 'Clayfoot Studios',
     pieceDarkYagami: 'Dark Yagami',
     pieceStones: 'Traditional Stones',
+    deadStones: 'Dead Stones',
+    deadCube: 'Cube',
+    deadStone: 'Go Stone',
     playerSide: 'Player Side',
     sideBlack: 'Black (First)',
     sideWhite: 'White (Second)',
@@ -98,6 +106,8 @@ const DICTIONARIES: Record<Language, Translations> = {
     language: 'Language',
     hoverEval: 'Hover Eval',
     hoverEvalTitle: 'Realtime ownership preview on mouse hover',
+    heatmap: 'Territory',
+    heatmapTitle: 'Show predicted territory colors',
     newGame: 'New',
     newGameTitle: 'Start a new game',
     pass: 'Pass',
@@ -169,6 +179,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     pieceClayfoot: 'Clayfoot Studios',
     pieceDarkYagami: 'Dark Yagami',
     pieceStones: '伝統的な碁石',
+    deadStones: '死石',
+    deadCube: 'キューブ',
+    deadStone: '碁石',
     playerSide: '手番',
     sideBlack: '黒番 (先手)',
     sideWhite: '白番 (後手)',
@@ -176,6 +189,8 @@ const DICTIONARIES: Record<Language, Translations> = {
     language: '言語',
     hoverEval: 'ホバー予測',
     hoverEvalTitle: 'マウスホバー時のリアルタイム勢力予測',
+    heatmap: '地合い',
+    heatmapTitle: '予測された地を色付け表示',
     newGame: '対局開始',
     newGameTitle: '新しい対局を開始',
     pass: 'パス',
@@ -247,6 +262,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     pieceClayfoot: 'Clayfoot Studios',
     pieceDarkYagami: 'Dark Yagami',
     pieceStones: 'Piedras tradicionales',
+    deadStones: 'Piedras muertas',
+    deadCube: 'Cubo',
+    deadStone: 'Piedra',
     playerSide: 'Bando',
     sideBlack: 'Negras (Primera)',
     sideWhite: 'Blancas (Segunda)',
@@ -254,6 +272,8 @@ const DICTIONARIES: Record<Language, Translations> = {
     language: 'Idioma',
     hoverEval: 'Eval. al pasar',
     hoverEvalTitle: 'Predicción de territorio en tiempo real al pasar el ratón',
+    heatmap: 'Territorio',
+    heatmapTitle: 'Mostrar colores de territorio previsto',
     newGame: 'Nueva',
     newGameTitle: 'Iniciar una nueva partida',
     pass: 'Pasar',

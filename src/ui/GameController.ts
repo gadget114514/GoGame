@@ -2,7 +2,7 @@ import { Goban, BLACK, WHITE, type MoveRecord } from '../game/Goban';
 import { DEFAULT_KOMI, formatCoordinate, isBoardSize, type BoardSize } from '../game/BoardSize';
 import { KataGoEngine, type Evaluation } from '../ai/KataGoEngine';
 import type { AILevel } from '../ai/registry';
-import { Board3D, type PieceStyle, type RenderState } from './Board3D';
+import { Board3D, type DeadStoneStyle, type PieceStyle, type RenderState } from './Board3D';
 import { Board2D } from './Board2D';
 import { detectInitialLanguage, setLanguage, t, type Language } from '../i18n';
 import { generateSGF, parseSGF } from '../game/sgf';
@@ -15,8 +15,10 @@ interface Elements {
   aiLevel: HTMLSelectElement;
   playerSide: HTMLSelectElement;
   pieceStyle: HTMLSelectElement;
+  deadStoneStyle: HTMLSelectElement;
   languageSelect: HTMLSelectElement;
   toggleHoverEval: HTMLInputElement;
+  toggleHeatmap: HTMLInputElement;
   toggleEvalGraph: HTMLInputElement;
   komi: HTMLInputElement;
   newGame: HTMLButtonElement;
@@ -79,6 +81,7 @@ export class GameController {
   private goban: Goban;
   private opponent: OpponentMode = 'dan';
   private playerSide: 'black' | 'white' = 'black';
+  private deadStoneStyle: DeadStoneStyle = 'cube';
   private view: ViewMode = '3d';
   private evaluation: Evaluation | null = null;
   private busy = false;
@@ -94,6 +97,7 @@ export class GameController {
   }
 
   private hoverEvalEnabled = true;
+  private heatmapEnabled = true;
   private hoverIndex: number | null = null;
   private hoverEvaluation: Evaluation | null = null;
   private hoverToken = 0;
@@ -117,8 +121,10 @@ export class GameController {
       aiLevel: requireElement('ai-level'),
       playerSide: requireElement('player-side'),
       pieceStyle: requireElement('piece-style'),
+      deadStoneStyle: requireElement('dead-stone-style'),
       languageSelect: requireElement('language-select'),
       toggleHoverEval: requireElement('toggle-hover-eval'),
+      toggleHeatmap: requireElement('toggle-heatmap'),
       toggleEvalGraph: requireElement('toggle-eval-graph'),
       komi: requireElement('komi'),
       newGame: requireElement('btn-new'),
@@ -168,8 +174,21 @@ export class GameController {
     const savedStyle = (localStorage.getItem('gogame:pieceStyle') as PieceStyle) || 'clayfoot';
     this.els.pieceStyle.value = savedStyle;
 
+    const savedDeadStyle = localStorage.getItem('gogame:deadStoneStyle');
+    const initialDeadStyle: DeadStoneStyle =
+      savedDeadStyle === 'cube' || savedDeadStyle === 'stone'
+        ? savedDeadStyle
+        : savedStyle === 'stones'
+          ? 'stone'
+          : 'cube';
+    this.deadStoneStyle = initialDeadStyle;
+    this.els.deadStoneStyle.value = initialDeadStyle;
+
     this.hoverEvalEnabled = localStorage.getItem('gogame:hoverEval') !== 'false';
     this.els.toggleHoverEval.checked = this.hoverEvalEnabled;
+
+    this.heatmapEnabled = localStorage.getItem('gogame:heatmap') !== 'false';
+    this.els.toggleHeatmap.checked = this.heatmapEnabled;
 
     this.evalGraphEnabled = localStorage.getItem('gogame:evalGraph') !== 'false';
     this.els.toggleEvalGraph.checked = this.evalGraphEnabled;
@@ -198,6 +217,7 @@ export class GameController {
 
     this.board3d.setBoardSize(size);
     this.board3d.setPerspective(savedSide);
+    this.setDeadStoneStyle(this.deadStoneStyle);
     void this.board3d.setPieceStyle(savedStyle);
     this.board2d.resize();
     this.board2d.setPerspective(savedSide);
@@ -253,10 +273,14 @@ export class GameController {
       const style = (this.els.pieceStyle.value as PieceStyle) || 'clayfoot';
       localStorage.setItem('gogame:pieceStyle', style);
       void this.board3d.setPieceStyle(style);
+      this.setDeadStoneStyle(style === 'stones' ? 'stone' : 'cube');
       const legend = document.getElementById('rank-legend');
       if (legend) {
         legend.style.display = style === 'stones' ? 'none' : '';
       }
+    });
+    this.els.deadStoneStyle.addEventListener('change', () => {
+      this.setDeadStoneStyle(this.els.deadStoneStyle.value === 'stone' ? 'stone' : 'cube');
     });
     this.els.languageSelect.addEventListener('change', () => {
       const lang = this.els.languageSelect.value as Language;
@@ -272,6 +296,11 @@ export class GameController {
     });
     this.els.toggleEvalGraph.addEventListener('change', () => {
       this.setEvalGraphEnabled(this.els.toggleEvalGraph.checked);
+    });
+    this.els.toggleHeatmap.addEventListener('change', () => {
+      this.heatmapEnabled = this.els.toggleHeatmap.checked;
+      localStorage.setItem('gogame:heatmap', String(this.heatmapEnabled));
+      this.render();
     });
     this.els.aiLevel.addEventListener('change', () => {
       const val = this.els.aiLevel.value;
@@ -348,6 +377,16 @@ export class GameController {
     this.evalGraph.updateLanguage();
     this.updateViewButtonText();
     this.updateStatus();
+  }
+
+  private setDeadStoneStyle(style: DeadStoneStyle): void {
+    this.deadStoneStyle = style;
+    this.els.deadStoneStyle.value = style;
+    localStorage.setItem('gogame:deadStoneStyle', style);
+    this.board3d.setDeadStoneStyle(style);
+    document
+      .querySelector<HTMLElement>('#rank-legend li.dead .cube')
+      ?.classList.toggle('stone', style === 'stone');
   }
 
   private setEvalGraphEnabled(enabled: boolean): void {
@@ -889,10 +928,11 @@ export class GameController {
       goban: this.goban,
       evaluation: activeEval,
       moveWeights: this.moveWeights(),
-      opponentColor: this.isManualMode() ? null : this.playerSide === 'black' ? WHITE : BLACK
+      opponentColor: this.isManualMode() ? null : this.playerSide === 'black' ? WHITE : BLACK,
+      showHeatmap: this.heatmapEnabled
     };
     this.board3d.update(state);
-    this.board2d.update(this.goban, activeEval);
+    this.board2d.update(this.goban, activeEval, this.heatmapEnabled);
   }
 
   private formatIntersection(index: number): string {

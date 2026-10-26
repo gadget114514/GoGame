@@ -39,12 +39,22 @@
               <option value="stones" data-i18n="pieceStones">Traditional Stones</option>
             </select>
           </label>
+          <label><span data-i18n="deadStones">Dead Stones</span>
+            <select id="dead-stone-style">
+              <option value="cube" data-i18n="deadCube" selected>Cube</option>
+              <option value="stone" data-i18n="deadStone">Go Stone</option>
+            </select>
+          </label>
           <label><span data-i18n="komi">Komi</span>
             <input id="komi" type="number" step="0.5" min="0" max="20" value="7.5" />
           </label>
           <label class="toggle-control" id="label-hover-eval" title="Realtime ownership preview on mouse hover">
             <input id="toggle-hover-eval" type="checkbox" checked />
             <span data-i18n="hoverEval">Hover Eval</span>
+          </label>
+          <label class="toggle-control" id="label-heatmap" data-i18n-title="heatmapTitle" title="Territory heatmap">
+            <input id="toggle-heatmap" type="checkbox" checked />
+            <span data-i18n="heatmap">Territory</span>
           </label>
           <label class="toggle-control" id="label-eval-graph" title="Evaluation graph">
             <input id="toggle-eval-graph" type="checkbox" checked />
@@ -105,7 +115,7 @@
             <li><span class="glyph">♝</span><span class="name" data-i18n="bishop">Bishop</span><span class="range">43–49%</span></li>
             <li><span class="glyph">♞</span><span class="name" data-i18n="knight">Knight</span><span class="range">31–42%</span></li>
             <li><span class="glyph">♟</span><span class="name" data-i18n="pawn">Pawn</span><span class="range">0–30%</span></li>
-            <li class="dead"><span class="cube"></span><span class="name" data-i18n="dead">Dead</span><span class="range">&lt; 0%</span></li>
+            <li class="dead"><span class="cube" id="dead-marker"></span><span class="name" data-i18n="dead">Dead</span><span class="range">&lt; 0%</span></li>
           </ul>
         </aside>
         <div id="thinking" class="overlay" hidden><span class="spinner"></span> <span data-i18n="thinking">Thinking…</span></div>

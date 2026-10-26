@@ -25,12 +25,14 @@ import { heatColor } from './heatmap';
 import { pieceRank } from './pieceRank';
 
 export type PieceStyle = 'clayfoot' | 'dark-yagami' | 'stones';
+export type DeadStoneStyle = 'cube' | 'stone';
 
 export interface RenderState {
   goban: Goban;
   evaluation: Evaluation | null;
   moveWeights: Map<number, number>;
   opponentColor: number | null;
+  showHeatmap: boolean;
 }
 
 interface PieceHandle {
@@ -72,6 +74,7 @@ export class Board3D {
   private coordTexture: DynamicTexture | null = null;
 
   private currentStyle: PieceStyle = 'clayfoot';
+  private deadStoneStyle: DeadStoneStyle = 'cube';
   private perspective: 'black' | 'white' = 'black';
   private directional: DirectionalLight;
   private styleContainers = new Map<PieceStyle, Map<PieceFile, AssetContainer>>();
@@ -512,7 +515,7 @@ export class Board3D {
 
     const ownership = state.evaluation?.ownership;
     const isWhite = this.perspective === 'white';
-    if (ownership && ownership.length >= n * n) {
+    if (state.showHeatmap && ownership && ownership.length >= n * n) {
       for (let row = 0; row < n; row++) {
         for (let col = 0; col < n; col++) {
           const value = ownership[row * n + col];
@@ -735,14 +738,28 @@ export class Board3D {
     return ((this.size - 1) / 2 - row) * SPACING;
   }
 
+  setDeadStoneStyle(style: DeadStoneStyle): void {
+    if (this.deadStoneStyle === style) return;
+    this.deadStoneStyle = style;
+    this.pieces.forEach((piece) => piece.root.dispose());
+    this.pieces.clear();
+    if (this.lastState) {
+      this.syncPieces(this.lastState);
+    }
+  }
+
   private createPieceNode(rank: number, color: number, index: number, dead: boolean): TransformNode {
     const wrapper = new TransformNode(`piece-${index}`, this.scene);
-    if (this.currentStyle === 'stones') {
-      this.buildStone(wrapper, color);
+    if (dead) {
+      if (this.deadStoneStyle === 'stone') {
+        this.buildStone(wrapper, color);
+      } else {
+        this.buildDeadCube(wrapper, color);
+      }
       return wrapper;
     }
-    if (dead) {
-      this.buildDeadCube(wrapper, color);
+    if (this.currentStyle === 'stones') {
+      this.buildStone(wrapper, color);
       return wrapper;
     }
     if (this.fallback) {
