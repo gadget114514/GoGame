@@ -465,7 +465,8 @@ own = color === BLACK ? ownership : -ownership
 dead = own < 0
 
 if lastMove && !dead: rank = 5                 (king)
-else if dead:         small cube              (3D) / small square (2D)
+else if dead:         small cube (3D chess styles) / small square (2D);
+                      a normal stone in the traditional stones style
 else:
   own >= 0.75 -> 5 king
   own >= 0.61 -> 4 queen

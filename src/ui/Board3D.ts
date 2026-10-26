@@ -737,12 +737,12 @@ export class Board3D {
 
   private createPieceNode(rank: number, color: number, index: number, dead: boolean): TransformNode {
     const wrapper = new TransformNode(`piece-${index}`, this.scene);
-    if (dead) {
-      this.buildDeadCube(wrapper, color);
-      return wrapper;
-    }
     if (this.currentStyle === 'stones') {
       this.buildStone(wrapper, color);
+      return wrapper;
+    }
+    if (dead) {
+      this.buildDeadCube(wrapper, color);
       return wrapper;
     }
     if (this.fallback) {

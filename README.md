@@ -18,7 +18,7 @@ predicted territory.
     models are added (drop them in `public/models/{dan,kyu}-{9,13}x{...}/`).
 - **3D view** (Babylon.js): chess-piece stones (`pawn → knight → bishop → rook →
   queen → king`) driven by color-relative ownership thresholds; dead stones
-  become small cubes.
+  become small cubes in the chess-piece styles (traditional stones stay stones).
 - **Score colorization**: per-intersection ownership heatmap on both the 3D board
   and the 2D fallback.
 - **2D fallback** view, SGF save/load, pass, undo, evaluation.

@@ -91,7 +91,8 @@ Each stone is one of six meshes (`pawn`, `knight`, `bishop`, `rook`, `queen`,
 `king`). Rank comes from the ownership at the stone's point, measured from that
 stone's own color perspective (`own = color === Black ? ownership : -ownership`):
 
-- `own < 0`: the network expects the stone to be dead → small cube.
+- `own < 0`: the network expects the stone to be dead → small cube (chess-piece
+  styles) or a normal stone (traditional stones style).
 - `own >= 0.31 / 0.43 / 0.50 / 0.61 / 0.75`: knight / bishop / rook / queen / king.
 - `0 <= own < 0.31`: pawn.
 
