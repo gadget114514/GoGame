@@ -888,7 +888,8 @@ export class GameController {
     const state: RenderState = {
       goban: this.goban,
       evaluation: activeEval,
-      moveWeights: this.moveWeights()
+      moveWeights: this.moveWeights(),
+      opponentColor: this.isManualMode() ? null : this.playerSide === 'black' ? WHITE : BLACK
     };
     this.board3d.update(state);
     this.board2d.update(this.goban, activeEval);

@@ -1,12 +1,9 @@
 import {
-  Animation,
   ArcRotateCamera,
   Color3,
   Color4,
-  CubicEase,
   DirectionalLight,
   DynamicTexture,
-  EasingFunction,
   Engine,
   HemisphericLight,
   Mesh,
@@ -33,6 +30,7 @@ export interface RenderState {
   goban: Goban;
   evaluation: Evaluation | null;
   moveWeights: Map<number, number>;
+  opponentColor: number | null;
 }
 
 interface PieceHandle {
@@ -40,6 +38,12 @@ interface PieceHandle {
   rank: number;
   color: number;
   dead: boolean;
+}
+
+interface PendingPlacement {
+  root: TransformNode;
+  color: number;
+  cancel: () => void;
 }
 
 const PIECE_FILES = ['pawn', 'knight', 'bishop', 'rook', 'queen', 'king'] as const;
@@ -85,6 +89,8 @@ export class Board3D {
   private lastMovePillar: Mesh;
   private lastMoveNumber = -1;
   private lastMovePulseAt = 0;
+  private lastMoveEmphasis = 1;
+  private pendingPlacements = new Map<number, PendingPlacement>();
   private effectSeed = 0;
 
   private hoverMarker: Mesh;
@@ -353,6 +359,8 @@ export class Board3D {
 
   setBoardSize(size: BoardSize): void {
     this.size = size;
+    this.pendingPlacements.forEach((pending) => pending.cancel());
+    this.pendingPlacements.clear();
     for (const node of this.boardNodes) node.dispose();
     this.boardNodes = [];
     this.boardMesh = null;
@@ -532,8 +540,15 @@ export class Board3D {
     for (let index = 0; index < n * n; index++) {
       const color = goban.board[index];
       const existing = this.pieces.get(index);
+      const pending = this.pendingPlacements.get(index);
+
+      if (pending && pending.color !== color) {
+        pending.cancel();
+      }
 
       if (color === BLACK || color === WHITE) {
+        if (this.pendingPlacements.has(index)) continue;
+
         const { rank, dead } = this.rankFor(index, color, state);
         if (
           !existing ||
@@ -543,24 +558,28 @@ export class Board3D {
         ) {
           const wasExisting = !!existing;
           existing?.root.dispose();
-          const root = this.createPieceNode(rank, color, index, dead);
           const row = Math.floor(index / n);
           const col = index % n;
           const targetX = this.worldCoordinateX(col);
           const targetZ = this.worldCoordinateZ(row);
           const targetY = 0.03;
-          root.position.set(targetX, targetY, targetZ);
-
           const isJustPlaced = isNewMove && index === state.goban.lastMove && !wasExisting;
+
           if (isJustPlaced) {
-            this.animatePlacement(root, targetY, color, () => {
-              const pieceColor = color === WHITE ? WHITE_MOVE_COLOR : BLACK_MOVE_COLOR;
-              this.spawnBurst(new Vector3(targetX, 0.16, targetZ), pieceColor, 54, 2.8);
-              this.spawnShockwave(new Vector3(targetX, 0.04, targetZ), pieceColor);
-              this.lastMovePulseAt = performance.now();
-            });
+            const isOpponentMove =
+              state.opponentColor !== null && color === state.opponentColor;
+            this.startStoneArrival(
+              index,
+              color,
+              new Vector3(targetX, targetY, targetZ),
+              isOpponentMove,
+              () => this.completeStoneArrival(index, color, targetX, targetY, targetZ, isOpponentMove)
+            );
+            continue;
           }
 
+          const root = this.createPieceNode(rank, color, index, dead);
+          root.position.set(targetX, targetY, targetZ);
           this.pieces.set(index, { root, rank, color, dead });
         }
       } else if (existing) {
@@ -584,6 +603,7 @@ export class Board3D {
     this.drawCoordinates(last);
 
     if (last === null) {
+      this.lastMoveEmphasis = 1;
       this.lastMoveRing.isVisible = false;
       this.lastMoveGlow.isVisible = false;
       this.lastMoveBeacon.isVisible = false;
@@ -597,6 +617,8 @@ export class Board3D {
     const x = this.worldCoordinateX(col);
     const z = this.worldCoordinateZ(row);
     const color = state.goban.board[last] === WHITE ? WHITE_MOVE_COLOR : BLACK_MOVE_COLOR;
+    this.lastMoveEmphasis =
+      state.opponentColor !== null && state.goban.board[last] === state.opponentColor ? 1.3 : 1;
 
     this.lastMoveMaterial.emissiveColor.copyFrom(color);
     this.lastMoveGlowMaterial.emissiveColor.copyFrom(color);
@@ -685,18 +707,19 @@ export class Board3D {
     const since = (now - this.lastMovePulseAt) / 1000;
     const pop = since >= 0 && since < 0.6 ? 1 + 1.2 * Math.exp(-since * 8) : 1;
     const shimmer = 1 + 0.055 * Math.sin(t * 6);
+    const emphasis = this.lastMoveEmphasis;
 
-    this.lastMoveRing.scaling.set(pop * shimmer, 1, pop * shimmer);
-    this.lastMoveGlow.scaling.setAll(1 + 0.08 * Math.sin(t * 4));
+    this.lastMoveRing.scaling.set(pop * shimmer * emphasis, 1, pop * shimmer * emphasis);
+    this.lastMoveGlow.scaling.setAll(emphasis * (1 + 0.08 * Math.sin(t * 4)));
 
     const beaconBaseY = 1.48;
     this.lastMoveBeacon.position.y = beaconBaseY + 0.07 * Math.sin(t * 3.8);
     this.lastMoveBeacon.rotation.y = t * 2.2;
     this.lastMoveBeacon.rotation.z = 0.12 * Math.sin(t * 1.6);
-    this.lastMoveBeacon.scaling.setAll(pop * (1 + 0.08 * Math.sin(t * 5)));
+    this.lastMoveBeacon.scaling.setAll(pop * emphasis * (1 + 0.08 * Math.sin(t * 5)));
 
-    this.lastMovePillar.scaling.x = 1 + 0.12 * Math.sin(t * 4);
-    this.lastMovePillar.scaling.z = 1 + 0.12 * Math.sin(t * 4);
+    this.lastMovePillar.scaling.x = emphasis * (1 + 0.12 * Math.sin(t * 4));
+    this.lastMovePillar.scaling.z = emphasis * (1 + 0.12 * Math.sin(t * 4));
 
     this.lastMoveMaterial.alpha = Math.min(
       1,
@@ -824,7 +847,8 @@ export class Board3D {
 
   private spawnPlacementTrail(
     root: TransformNode,
-    color: number
+    color: number,
+    dramatic = false
   ): { stop: () => void; dispose: () => void } {
     const anchor = MeshBuilder.CreateBox(
       `trail-anchor-${this.effectSeed++}`,
@@ -838,7 +862,7 @@ export class Board3D {
 
     const particles = new ParticleSystem(
       `placement-trail-${this.effectSeed++}`,
-      160,
+      dramatic ? 280 : 160,
       this.scene
     );
     particles.particleTexture = this.particleTexture;
@@ -856,11 +880,11 @@ export class Board3D {
       particles.colorDead = new Color4(0.35, 0.65, 0.95, 0);
     }
 
-    particles.minSize = 0.05;
-    particles.maxSize = 0.18;
+    particles.minSize = dramatic ? 0.07 : 0.05;
+    particles.maxSize = dramatic ? 0.26 : 0.18;
     particles.minLifeTime = 0.28;
     particles.maxLifeTime = 0.65;
-    particles.emitRate = 140; // Continuous stream of sparkling particles while descending
+    particles.emitRate = dramatic ? 240 : 140;
     particles.blendMode = ParticleSystem.BLENDMODE_ADD;
 
     particles.minEmitBox = new Vector3(-0.09, -0.05, -0.09);
@@ -901,103 +925,159 @@ export class Board3D {
     };
   }
 
-  private animatePlacement(
-    root: TransformNode,
-    targetY: number,
+  private startStoneArrival(
+    index: number,
     color: number,
-    onComplete?: () => void
+    target: Vector3,
+    dramatic: boolean,
+    onLanded: () => void
   ): void {
+    const stone = new TransformNode(`arrival-stone-${index}-${this.effectSeed++}`, this.scene);
+    this.buildStone(stone, color);
+
+    const start = this.placementStartPoint(target, dramatic);
+    const control = new Vector3(
+      (start.x + target.x) / 2,
+      Math.max(start.y, target.y) + (dramatic ? 2.6 : 1.7),
+      (start.z + target.z) / 2
+    );
+    const duration = dramatic ? 900 : 680;
+    const fromScale = dramatic ? 1.12 : 0.95;
+
+    stone.position.copyFrom(start);
+    stone.scaling.setAll(fromScale);
+
     let trail: { stop: () => void; dispose: () => void } | null = null;
     try {
-      trail = this.spawnPlacementTrail(root, color);
+      trail = this.spawnPlacementTrail(stone, color, dramatic);
     } catch {
       // Particles are purely cosmetic.
     }
 
-    try {
-      const startY = targetY + 3.4;
-      root.position.y = startY;
-
-      // Position animation: smoothly descends from above (0.55s) with a gentle settle
-      const animY = new Animation(
-        'piecePlacementY',
-        'position.y',
-        60,
-        Animation.ANIMATIONTYPE_FLOAT,
-        Animation.ANIMATIONLOOPMODE_CONSTANT
-      );
-
-      // 34 frames at 60fps = 0.567 seconds
-      animY.setKeys([
-        { frame: 0, value: startY },
-        { frame: 28, value: targetY },
-        { frame: 31, value: targetY + 0.04 },
-        { frame: 34, value: targetY }
-      ]);
-
-      const ease = new CubicEase();
-      ease.setEasingMode(EasingFunction.EASINGMODE_EASEOUT);
-      animY.setEasingFunction(ease);
-
-      // Scaling animation: starts slightly compact and blooms into full size
-      const origScaleX = root.scaling.x;
-      const origScaleY = root.scaling.y;
-      const origScaleZ = root.scaling.z;
-
-      root.scaling.set(origScaleX * 0.82, origScaleY * 0.82, origScaleZ * 0.82);
-
-      const animScaleX = new Animation(
-        'piecePlacementScaleX',
-        'scaling.x',
-        60,
-        Animation.ANIMATIONTYPE_FLOAT,
-        Animation.ANIMATIONLOOPMODE_CONSTANT
-      );
-      animScaleX.setKeys([
-        { frame: 0, value: origScaleX * 0.82 },
-        { frame: 28, value: origScaleX }
-      ]);
-      animScaleX.setEasingFunction(ease);
-
-      const animScaleY = new Animation(
-        'piecePlacementScaleY',
-        'scaling.y',
-        60,
-        Animation.ANIMATIONTYPE_FLOAT,
-        Animation.ANIMATIONLOOPMODE_CONSTANT
-      );
-      animScaleY.setKeys([
-        { frame: 0, value: origScaleY * 0.82 },
-        { frame: 28, value: origScaleY }
-      ]);
-      animScaleY.setEasingFunction(ease);
-
-      const animScaleZ = new Animation(
-        'piecePlacementScaleZ',
-        'scaling.z',
-        60,
-        Animation.ANIMATIONTYPE_FLOAT,
-        Animation.ANIMATIONLOOPMODE_CONSTANT
-      );
-      animScaleZ.setKeys([
-        { frame: 0, value: origScaleZ * 0.82 },
-        { frame: 28, value: origScaleZ }
-      ]);
-      animScaleZ.setEasingFunction(ease);
-
-      root.animations = [animY, animScaleX, animScaleY, animScaleZ];
-      this.scene.beginAnimation(root, 0, 34, false, 1.0, () => {
-        root.position.y = targetY;
-        root.scaling.set(origScaleX, origScaleY, origScaleZ);
-        trail?.stop();
-        trail?.dispose();
-        onComplete?.();
-      });
-    } catch {
-      root.position.y = targetY;
+    const startedAt = performance.now();
+    let finished = false;
+    const cleanup = () => {
+      if (finished) return;
+      finished = true;
+      trail?.stop();
       trail?.dispose();
-      onComplete?.();
+      stone.dispose();
+      this.pendingPlacements.delete(index);
+    };
+
+    const observer = this.scene.onBeforeRenderObservable.add(() => {
+      if (finished) return;
+      const t = Math.min(1, (performance.now() - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const inv = 1 - eased;
+      stone.position.x =
+        inv * inv * start.x + 2 * inv * eased * control.x + eased * eased * target.x;
+      stone.position.y =
+        inv * inv * start.y + 2 * inv * eased * control.y + eased * eased * target.y;
+      stone.position.z =
+        inv * inv * start.z + 2 * inv * eased * control.z + eased * eased * target.z;
+      stone.scaling.setAll(fromScale + (1 - fromScale) * eased);
+      if (t >= 1) {
+        this.scene.onBeforeRenderObservable.remove(observer);
+        cleanup();
+        onLanded();
+      }
+    });
+
+    this.pendingPlacements.set(index, {
+      root: stone,
+      color,
+      cancel: () => {
+        this.scene.onBeforeRenderObservable.remove(observer);
+        cleanup();
+      }
+    });
+  }
+
+  private placementStartPoint(target: Vector3, dramatic: boolean): Vector3 {
+    const half = (this.size - 1) / 2;
+    const camera = this.camera.position;
+    let awayX = -camera.x;
+    let awayZ = -camera.z;
+    const length = Math.hypot(awayX, awayZ);
+    if (length < 0.001) {
+      awayX = 0;
+      awayZ = 1;
+    } else {
+      awayX /= length;
+      awayZ /= length;
     }
+    const margin = dramatic ? 9.0 : 5.5;
+    const lateral = (target.x * -awayZ + target.z * awayX) * 0.3;
+    return new Vector3(
+      awayX * (half + margin) - awayZ * lateral,
+      target.y + (dramatic ? 4.4 : 2.9),
+      awayZ * (half + margin) + awayX * lateral
+    );
+  }
+
+  private completeStoneArrival(
+    index: number,
+    color: number,
+    targetX: number,
+    targetY: number,
+    targetZ: number,
+    dramatic: boolean
+  ): void {
+    const state = this.lastState;
+    if (!state || state.goban.board[index] !== color) return;
+
+    const { rank, dead } = this.rankFor(index, color, state);
+    const root = this.createPieceNode(rank, color, index, dead);
+    root.position.set(targetX, targetY, targetZ);
+    this.pieces.get(index)?.root.dispose();
+    this.pieces.set(index, { root, rank, color, dead });
+    this.animatePieceEntrance(index, root, dramatic);
+
+    const pieceColor = color === WHITE ? WHITE_MOVE_COLOR : BLACK_MOVE_COLOR;
+    if (dramatic) {
+      this.spawnBurst(new Vector3(targetX, 0.16, targetZ), pieceColor, 150, 5.2, 1.6);
+      this.spawnBurst(new Vector3(targetX, 0.05, targetZ), pieceColor, 70, 2.4, 1.25, true);
+      this.spawnShockwave(new Vector3(targetX, 0.04, targetZ), pieceColor, 1.6, 720);
+      this.spawnImpactBeam(new Vector3(targetX, 0.04, targetZ), pieceColor);
+      window.setTimeout(() => {
+        try {
+          const live = this.lastState;
+          if (!live || live.goban.board[index] !== color) return;
+          this.spawnShockwave(new Vector3(targetX, 0.04, targetZ), pieceColor, 1.0, 520);
+        } catch {
+          // The scene may already be disposed.
+        }
+      }, 150);
+    } else {
+      this.spawnBurst(new Vector3(targetX, 0.16, targetZ), pieceColor, 54, 2.8);
+      this.spawnShockwave(new Vector3(targetX, 0.04, targetZ), pieceColor);
+    }
+    this.lastMovePulseAt = performance.now();
+  }
+
+  private animatePieceEntrance(index: number, root: TransformNode, dramatic: boolean): void {
+    const base = root.scaling.clone();
+    const from = dramatic ? 0.4 : 0.7;
+    const duration = dramatic ? 320 : 220;
+    const startedAt = performance.now();
+    root.scaling.set(base.x * from, base.y * from, base.z * from);
+
+    const observer = this.scene.onBeforeRenderObservable.add(() => {
+      if (this.pieces.get(index)?.root !== root) {
+        this.scene.onBeforeRenderObservable.remove(observer);
+        return;
+      }
+      const t = Math.min(1, (performance.now() - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const overshoot = 1 + (dramatic ? 0.2 : 0.1) * Math.sin(t * Math.PI);
+      const scale = (from + (1 - from) * eased) * overshoot;
+      root.scaling.set(base.x * scale, base.y * scale, base.z * scale);
+      if (t >= 1) {
+        this.scene.onBeforeRenderObservable.remove(observer);
+        root.scaling.copyFrom(base);
+      }
+    });
   }
 
   private explodePiece(piece: PieceHandle): void {
@@ -1010,7 +1090,14 @@ export class Board3D {
     piece.root.dispose();
   }
 
-  private spawnBurst(position: Vector3, color: Color3, count: number, power: number): void {
+  private spawnBurst(
+    position: Vector3,
+    color: Color3,
+    count: number,
+    power: number,
+    sizeScale = 1,
+    fountain = false
+  ): void {
     const particles = new ParticleSystem(`burst-${this.effectSeed++}`, count * 2, this.scene);
     particles.particleTexture = this.particleTexture;
     particles.emitter = position.clone();
@@ -1024,18 +1111,22 @@ export class Board3D {
       0.9
     );
     particles.colorDead = new Color4(color.r, color.g, color.b, 0);
-    particles.minSize = 0.05;
-    particles.maxSize = 0.16;
-    particles.minLifeTime = 0.35;
-    particles.maxLifeTime = 0.8;
+    particles.minSize = 0.05 * sizeScale;
+    particles.maxSize = 0.16 * sizeScale;
+    particles.minLifeTime = fountain ? 0.5 : 0.35;
+    particles.maxLifeTime = fountain ? 1.15 : 0.8;
     particles.emitRate = 0;
     particles.manualEmitCount = count;
     particles.blendMode = ParticleSystem.BLENDMODE_ADD;
-    particles.direction1 = new Vector3(-power, 1.2, -power);
-    particles.direction2 = new Vector3(power, power + 2.2, power);
-    particles.minEmitPower = 0.6;
+    particles.direction1 = fountain
+      ? new Vector3(-0.7, 2.4, -0.7)
+      : new Vector3(-power, 1.2, -power);
+    particles.direction2 = fountain
+      ? new Vector3(0.7, 5.2, 0.7)
+      : new Vector3(power, power + 2.2, power);
+    particles.minEmitPower = fountain ? 0.4 : 0.6;
     particles.maxEmitPower = power;
-    particles.gravity = new Vector3(0, -7, 0);
+    particles.gravity = new Vector3(0, fountain ? -5.5 : -7, 0);
     particles.minAngularSpeed = -5;
     particles.maxAngularSpeed = 5;
     particles.updateSpeed = 0.012;
@@ -1091,7 +1182,12 @@ export class Board3D {
     }
   }
 
-  private spawnShockwave(position: Vector3, color: Color3): void {
+  private spawnShockwave(
+    position: Vector3,
+    color: Color3,
+    scale = 1,
+    duration = 500
+  ): void {
     const material = new StandardMaterial(`shock-material-${this.effectSeed++}`, this.scene);
     material.diffuseColor = Color3.Black();
     material.emissiveColor = color.clone();
@@ -1102,7 +1198,7 @@ export class Board3D {
 
     const ring = MeshBuilder.CreateTorus(
       `shock-ring-${this.effectSeed++}`,
-      { diameter: 0.7, thickness: 0.05, tessellation: 32 },
+      { diameter: 0.7 * scale, thickness: 0.05 * Math.max(1, scale), tessellation: 32 },
       this.scene
     );
     ring.material = material;
@@ -1112,7 +1208,7 @@ export class Board3D {
 
     const start = performance.now();
     const observer = this.scene.onBeforeRenderObservable.add(() => {
-      const t = (performance.now() - start) / 500;
+      const t = (performance.now() - start) / duration;
       if (t >= 1) {
         if (observer) this.scene.onBeforeRenderObservable.remove(observer);
         ring.dispose();
@@ -1121,6 +1217,43 @@ export class Board3D {
       }
       ring.scaling.setAll(0.4 + t * 2.4);
       material.alpha = 0.75 * (1 - t);
+    });
+  }
+
+  private spawnImpactBeam(position: Vector3, color: Color3): void {
+    const material = new StandardMaterial(`impact-beam-material-${this.effectSeed++}`, this.scene);
+    material.diffuseColor = Color3.Black();
+    material.emissiveColor = color.clone();
+    material.specularColor = Color3.Black();
+    material.disableLighting = true;
+    material.alpha = 0.85;
+    material.backFaceCulling = false;
+
+    const height = 3.4;
+    const beam = MeshBuilder.CreateCylinder(
+      `impact-beam-${this.effectSeed++}`,
+      { height, diameterTop: 0.04, diameterBottom: 0.42, tessellation: 24 },
+      this.scene
+    );
+    beam.material = material;
+    beam.position.set(position.x, height / 2, position.z);
+    beam.isPickable = false;
+
+    const start = performance.now();
+    const duration = 640;
+    const observer = this.scene.onBeforeRenderObservable.add(() => {
+      const t = (performance.now() - start) / duration;
+      if (t >= 1) {
+        if (observer) this.scene.onBeforeRenderObservable.remove(observer);
+        beam.dispose();
+        material.dispose();
+        return;
+      }
+      const fade = 1 - t;
+      const widen = 1 + t * 1.1;
+      material.alpha = 0.85 * fade * fade;
+      beam.scaling.set(widen, 1 - t * 0.25, widen);
+      beam.position.y = (height * (1 - t * 0.25)) / 2;
     });
   }
 
@@ -1220,6 +1353,8 @@ export class Board3D {
 
   dispose(): void {
     window.removeEventListener('resize', this.resize);
+    this.pendingPlacements.forEach((pending) => pending.cancel());
+    this.pendingPlacements.clear();
     this.scene.dispose();
     this.engine.dispose();
   }
