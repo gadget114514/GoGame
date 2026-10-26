@@ -37,6 +37,7 @@ export interface Translations {
   bishop: string;
   knight: string;
   pawn: string;
+  king: string;
   dead: string;
   thinking: string;
   bootLoading: string;
@@ -119,6 +120,7 @@ const DICTIONARIES: Record<Language, Translations> = {
     bishop: 'Bishop',
     knight: 'Knight',
     pawn: 'Pawn',
+    king: 'King',
     dead: 'Dead',
     thinking: 'Thinking…',
     bootLoading: 'Loading KataGo model…',
@@ -196,6 +198,7 @@ const DICTIONARIES: Record<Language, Translations> = {
     bishop: 'ビショップ',
     knight: 'ナイト',
     pawn: 'ポーン',
+    king: 'キング',
     dead: '死石',
     thinking: '思考中…',
     bootLoading: 'KataGoモデル読込中…',
@@ -273,6 +276,7 @@ const DICTIONARIES: Record<Language, Translations> = {
     bishop: 'Alfil',
     knight: 'Caballo',
     pawn: 'Peón',
+    king: 'Rey',
     dead: 'Muerta',
     thinking: 'Pensando…',
     bootLoading: 'Cargando modelo KataGo…',

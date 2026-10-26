@@ -42,7 +42,7 @@ interface PieceHandle {
   dead: boolean;
 }
 
-const PIECE_FILES = ['pawn', 'knight', 'bishop', 'rook', 'queen'] as const;
+const PIECE_FILES = ['pawn', 'knight', 'bishop', 'rook', 'queen', 'king'] as const;
 type PieceFile = (typeof PIECE_FILES)[number];
 
 const SPACING = 1;
