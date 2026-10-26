@@ -904,6 +904,7 @@ export class GameController {
   }
 
   private updateStatus(): void {
+    this.els.score.classList.remove('preview', 'up', 'down');
     let lastInfo = '';
     if (this.goban.moves.length > 0) {
       const lastRecord = this.goban.moves[this.goban.moves.length - 1];
@@ -953,6 +954,12 @@ export class GameController {
       const winLabel = `${winPct}% ${winSide}`;
       const padded = activeEval.padded ? ` · ${t('paddedNet')}` : '';
       const isHover = this.hoverEvaluation !== null && this.hoverIndex !== null;
+      if (isHover && this.evaluation) {
+        const sign = this.goban.side === BLACK ? 1 : -1;
+        const delta = (activeEval.scoreLead - this.evaluation.scoreLead) * sign;
+        if (delta > 0.05) this.els.score.classList.add('preview', 'up');
+        else if (delta < -0.05) this.els.score.classList.add('preview', 'down');
+      }
       const hoverPrefix = isHover
         ? `[${t('preview')} ${this.formatIntersection(this.hoverIndex!)}] `
         : '';

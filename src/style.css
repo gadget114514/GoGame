@@ -148,8 +148,16 @@ canvas[hidden],
 }
 
 #status #score {
-  color: var(--accent);
+  color: var(--text);
   font-variant-numeric: tabular-nums;
+}
+
+#status #score.preview.up {
+  color: #6db8ff;
+}
+
+#status #score.preview.down {
+  color: #ff6b6b;
 }
 
 #rank-legend {

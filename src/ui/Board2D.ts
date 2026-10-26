@@ -442,16 +442,6 @@ export class Board2D {
       }
       return;
     }
-    const { x: cx, y: cy } = this.coordToCanvas(col, row);
-    if (Math.hypot(event.offsetX - cx, event.offsetY - cy) > this.cell * 0.5) {
-      if (this.hoverIndex !== null) {
-        this.hoverIndex = null;
-        this.render();
-        this.hoverHandler?.(null);
-      }
-      return;
-    }
-
     const index = row * this.size + col;
     if (index !== this.hoverIndex) {
       this.hoverIndex = index;
@@ -472,8 +462,6 @@ export class Board2D {
     if (!this.goban || !this.clickHandler) return;
     const { col, row } = this.canvasToCoord(event.offsetX, event.offsetY);
     if (col < 0 || col >= this.size || row < 0 || row >= this.size) return;
-    const { x: cx, y: cy } = this.coordToCanvas(col, row);
-    if (Math.hypot(event.offsetX - cx, event.offsetY - cy) > this.cell * 0.5) return;
     this.clickHandler(row * this.size + col);
   }
 

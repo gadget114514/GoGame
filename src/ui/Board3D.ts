@@ -1170,17 +1170,6 @@ export class Board3D {
         return;
       }
 
-      const x = this.worldCoordinateX(col);
-      const z = this.worldCoordinateZ(row);
-      if (Math.hypot(point.x - x, point.z - z) > SPACING * 0.5) {
-        if (lastHoverIndex !== null) {
-          lastHoverIndex = null;
-          this.setHoverMarker(null);
-          this.hoverHandler?.(null);
-        }
-        return;
-      }
-
       const index = row * n + col;
       if (index !== lastHoverIndex) {
         lastHoverIndex = index;
@@ -1221,10 +1210,6 @@ export class Board3D {
     const col = Math.round(point.x / SPACING + half);
     const row = Math.round(half - point.z / SPACING);
     if (col < 0 || col >= n || row < 0 || row >= n) return;
-
-    const x = this.worldCoordinateX(col);
-    const z = this.worldCoordinateZ(row);
-    if (Math.hypot(point.x - x, point.z - z) > SPACING * 0.5) return;
 
     this.clickHandler(row * n + col);
   }
