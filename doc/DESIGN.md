@@ -12,7 +12,7 @@ lives in [`DESIGN-detail.md`](./DESIGN-detail.md).
 - AI from **KataGo** neural networks converted to **TensorFlow.js**, with no
   server component and no native binaries at runtime.
 - Stones rendered as **Dark_Yagami chess pieces** on a 3D board, ranked from
-  pawn to queen by the network's ownership/weight estimate.
+  pawn to king by the network's ownership/weight estimate.
 - The board surface is **colorized by predicted ownership**, so territory and
   influence are visible while playing.
 

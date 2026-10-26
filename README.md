@@ -1,9 +1,11 @@
 # GoGame 3D
 
 A 3D Go game that runs in the browser (GitHub Pages / PWA) and as an Electron
-desktop app. Stones are chess pieces whose rank grows from pawn to queen based
+desktop app. Stones are chess pieces whose rank grows from pawn to king based
 on the KataGo ownership/weight estimate, and the board surface is tinted by the
 predicted territory.
+
+![GoGame 3D](doc/screenshot.png)
 
 **Play online:** https://gadget114514.github.io/GoGame/
 
@@ -15,8 +17,8 @@ predicted territory.
   - 9×9/13×13 use padded inference with the 19×19 net until dedicated per-size
     models are added (drop them in `public/models/{dan,kyu}-{9,13}x{...}/`).
 - **3D view** (Babylon.js): chess-piece stones (`pawn → knight → bishop → rook →
-  queen`) driven by color-relative ownership thresholds; dead stones become
-  small cubes.
+  queen → king`) driven by color-relative ownership thresholds; dead stones
+  become small cubes.
 - **Score colorization**: per-intersection ownership heatmap on both the 3D board
   and the 2D fallback.
 - **2D fallback** view, SGF save/load, pass, undo, evaluation.
