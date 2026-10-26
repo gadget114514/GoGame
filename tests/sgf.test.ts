@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BLACK, WHITE, Goban } from '../src/game/Goban';
-import { generateSGF, parseSGF, indexToSGFCoord, sgfCoordToIndex, escapeSGFText } from '../src/game/Sgf';
+import { generateSGF, parseSGF, indexToSGFCoord, sgfCoordToIndex, escapeSGFText } from '../src/game/sgf';
 
 describe('SGF Parser and Generator', () => {
   it('converts between board index and SGF coordinates', () => {
