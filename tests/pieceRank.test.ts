@@ -6,14 +6,14 @@ describe('pieceRank', () => {
   it('maps ownership thresholds to ranks', () => {
     expect(pieceRank(0.75, BLACK, false).rank).toBe(5);
     expect(pieceRank(0.74, BLACK, false).rank).toBe(4);
-    expect(pieceRank(0.60, BLACK, false).rank).toBe(4);
-    expect(pieceRank(0.59, BLACK, false).rank).toBe(3);
+    expect(pieceRank(0.61, BLACK, false).rank).toBe(4);
+    expect(pieceRank(0.60, BLACK, false).rank).toBe(3);
     expect(pieceRank(0.50, BLACK, false).rank).toBe(3);
     expect(pieceRank(0.49, BLACK, false).rank).toBe(2);
-    expect(pieceRank(0.40, BLACK, false).rank).toBe(2);
-    expect(pieceRank(0.39, BLACK, false).rank).toBe(1);
-    expect(pieceRank(0.25, BLACK, false).rank).toBe(1);
-    expect(pieceRank(0.24, BLACK, false).rank).toBe(0);
+    expect(pieceRank(0.43, BLACK, false).rank).toBe(2);
+    expect(pieceRank(0.42, BLACK, false).rank).toBe(1);
+    expect(pieceRank(0.31, BLACK, false).rank).toBe(1);
+    expect(pieceRank(0.30, BLACK, false).rank).toBe(0);
   });
 
   it('uses the stone color perspective', () => {

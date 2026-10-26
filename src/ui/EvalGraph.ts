@@ -38,7 +38,7 @@ export class EvalGraph {
   private points = new Map<number, EvalPoint>();
   private totalMoves = 0;
   private currentStep = 0;
-  private mode: GraphMode = 'winrate';
+  private mode: GraphMode = 'lead';
   private hoverMove: number | null = null;
   private onSelectMoveHandler: ((moveNum: number) => void) | null = null;
   private onVisibilityChangeHandler: ((visible: boolean) => void) | null = null;

@@ -87,17 +87,17 @@ locates `policy_output`, `ownership_output`, `miscvalues_output`, and
 
 ### 5. Chess rank is a visual encoding, not a game rule
 
-Each stone is one of five meshes (`pawn`, `knight`, `bishop`, `rook`, `queen`).
-Rank comes from the ownership at the stone's point, measured from that stone's
-own color perspective (`own = color === Black ? ownership : -ownership`):
+Each stone is one of six meshes (`pawn`, `knight`, `bishop`, `rook`, `queen`,
+`king`). Rank comes from the ownership at the stone's point, measured from that
+stone's own color perspective (`own = color === Black ? ownership : -ownership`):
 
 - `own < 0`: the network expects the stone to be dead → small cube.
-- `own >= 0.15 / 0.35 / 0.55 / 0.75`: knight / bishop / rook / queen.
-- `0 <= own < 0.15`: pawn.
+- `own >= 0.31 / 0.43 / 0.50 / 0.61 / 0.75`: knight / bishop / rook / queen / king.
+- `0 <= own < 0.31`: pawn.
 
-A live last move is promoted to queen as a visual accent; a dead last move is
+A live last move is promoted to king as a visual accent; a dead last move is
 not promoted. The policy weight is still recorded on moves but no longer affects
-rank. The `king.glb` asset is bundled but not used.
+rank.
 
 ### 6. Relative base and an app:// protocol
 

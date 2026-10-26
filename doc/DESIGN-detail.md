@@ -427,9 +427,9 @@ Scene:
 - Hemispheric + directional lights.
 - Materials: wood board, dark star points, glossy black stones/pieces, warm
   white pieces.
-- Chess pieces are loaded once from `assets/chess/{pawn,knight,bishop,rook,queen}.glb`
+- Chess pieces are loaded once from `assets/chess/{pawn,knight,bishop,rook,queen,king}.glb`
   via `SceneLoader.LoadAssetContainerAsync` and instantiated per stone with
-  `instantiateModelsToScene`. `king.glb` is not used.
+  `instantiateModelsToScene`.
 - If loading fails, `fallback` is set and primitive cylinders/spheres are used.
 
 Board rebuild (`setBoardSize`):
@@ -454,7 +454,8 @@ Pieces:
   `Map<index, {root, rank, color, dead}>`.
 - New or changed pieces are recreated at
   `(col - (N-1)/2, 0.03, row - (N-1)/2)`.
-- New pieces drop from `y + 2.2` to the target over 10 frames at 60 fps.
+- New pieces fly in as a go stone from off-board and are replaced by the
+  evaluated piece when they land.
 - Captured stones are disposed.
 
 Rank mapping (`src/ui/pieceRank.ts`):
@@ -463,13 +464,14 @@ Rank mapping (`src/ui/pieceRank.ts`):
 own = color === BLACK ? ownership : -ownership
 dead = own < 0
 
-if lastMove && !dead: rank = 4                 (queen)
+if lastMove && !dead: rank = 5                 (king)
 else if dead:         small cube              (3D) / small square (2D)
 else:
-  own >= 0.75 -> 4 queen
-  own >= 0.55 -> 3 rook
-  own >= 0.35 -> 2 bishop
-  own >= 0.15 -> 1 knight
+  own >= 0.75 -> 5 king
+  own >= 0.61 -> 4 queen
+  own >= 0.50 -> 3 rook
+  own >= 0.43 -> 2 bishop
+  own >= 0.31 -> 1 knight
   otherwise   -> 0 pawn
 ```
 
@@ -622,8 +624,7 @@ model is broken, the engine falls back to 19×19 at runtime.
   override with `FBX2GLTF`.
 - Command: `FBX2glTF --binary --input <fbx> --output <path-without-suffix>`
 
-Sizes are roughly 30–83 KB per GLB. `king.glb` is produced and bundled but not
-used by the current five-rank renderer.
+Sizes are roughly 30–83 KB per GLB. `king.glb` is used for the king rank.
 
 ## 10. Testing and verification
 
@@ -704,7 +705,6 @@ lighting, piece proportions) still needs a human pass.
 - Dead stones are small cubes but not removed or excluded from scoring. A proper
   finish would need a dead-stone-marking phase or an agreed removal step before
   final scoring.
-- `king.glb` is unused.
 - No captured-stone tray, move list, sound, or score-estimate graph.
 - `scoreTint()` is unused.
 - No i18n or accessibility audit.

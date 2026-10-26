@@ -5,7 +5,7 @@ import { BLACK } from '../game/Goban';
  * color perspective. A stone in enemy influence (negative own ownership) is
  * treated as dead regardless of its magnitude.
  */
-export const RANK_THRESHOLDS = [0.75, 0.60, 0.50, 0.40, 0.25] as const;
+export const RANK_THRESHOLDS = [0.75, 0.61, 0.50, 0.43, 0.31] as const;
 
 export interface PieceRank {
   /** 0 = pawn, 1 = knight, 2 = bishop, 3 = rook, 4 = queen, 5 = king. */
