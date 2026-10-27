@@ -33,10 +33,12 @@ describe('game config', () => {
     const config = loadConfig();
 
     expect(config.boardSize).toBe(9);
+    expect(config.rules).toBe('chinese');
     expect(config.komi).toBe(7);
     expect(config.pieceStyle).toBe('quirky-animals');
     expect(config.heatmapTheme).toBe('green-orange');
     expect(config.captureEffect).toBe('shatter');
+    expect(config.fenceModel).toBe('dark');
     expect(config.boardColor).toBe('wood');
     expect(config.animations).toBe(true);
     expect(config.wallModel).toBe('fence');
@@ -52,10 +54,12 @@ describe('game config', () => {
     saveConfig({
       ...DEFAULT_CONFIG,
       boardSize: 13,
+      rules: 'chinese',
       komi: 7.5,
       pieceStyle: 'animal-bag',
       boardColor: 'green',
       captureEffect: 'dissolve',
+      fenceModel: 'light',
       wallModel: 'seaweed',
       trueEyeModel: 'cute',
       falseEyeModels: false
@@ -68,6 +72,7 @@ describe('game config', () => {
     expect(config.pieceStyle).toBe('animal-bag');
     expect(config.boardColor).toBe('green');
     expect(config.captureEffect).toBe('dissolve');
+    expect(config.fenceModel).toBe('light');
     expect(config.wallModel).toBe('seaweed');
     expect(config.trueEyeModel).toBe('cute');
     expect(config.falseEyeModels).toBe(false);

@@ -11,6 +11,7 @@ import {
   Mesh,
   MeshBuilder,
   ParticleSystem,
+  PBRMaterial,
   Scene,
   SceneLoader,
   StandardMaterial,
@@ -31,6 +32,7 @@ import type { Evaluation } from '../ai/KataGoEngine';
 import { detectTwoEyes, type EyeAnalysis } from '../game/eyes';
 import { heatColor, type HeatmapTheme } from './heatmap';
 import { boardPalette, type BoardColor } from './boardTheme';
+import type { FenceModel } from './fenceModels';
 import { pieceRank } from './pieceRank';
 
 export type PieceStyle =
@@ -54,6 +56,7 @@ export interface RenderState {
   animations: boolean;
   showTwoEyeHighlight: boolean;
   wallModel: WallModel;
+  fenceModel: FenceModel;
   trueEyeModel: TrueEyeModel;
   showFalseEyeModels: boolean;
   captureEffect: CaptureEffect;
@@ -202,6 +205,8 @@ export class Board3D {
   private whiteMaterial: StandardMaterial;
   private animalWhiteMaterial: StandardMaterial;
   private animalBlackMaterial: StandardMaterial;
+  private quirkyWhiteMaterial: StandardMaterial;
+  private quirkyBlackMaterial: StandardMaterial;
 
   private boardNodes: Node[] = [];
   private boardMesh: Mesh | null = null;
@@ -212,6 +217,7 @@ export class Board3D {
   private coordTexture: DynamicTexture | null = null;
 
   private boardColor: BoardColor = 'wood';
+  private fenceModel: FenceModel = 'dark';
   private currentStyle: PieceStyle = 'quirky-animals';
   private deadStoneStyle: DeadStoneStyle = 'cube';
   private perspective: 'black' | 'white' = 'black';
@@ -322,6 +328,16 @@ export class Board3D {
     this.animalBlackMaterial.specularColor = new Color3(0.45, 0.45, 0.5);
     this.animalBlackMaterial.specularPower = 48;
     this.animalBlackMaterial.emissiveColor = new Color3(0.012, 0.012, 0.02);
+
+    this.quirkyWhiteMaterial = new StandardMaterial('quirky-white', this.scene);
+    this.quirkyWhiteMaterial.diffuseColor = new Color3(0.95, 0.94, 0.9);
+    this.quirkyWhiteMaterial.specularColor = Color3.Black();
+    this.quirkyWhiteMaterial.emissiveColor = new Color3(0.045, 0.044, 0.04);
+
+    this.quirkyBlackMaterial = new StandardMaterial('quirky-black', this.scene);
+    this.quirkyBlackMaterial.diffuseColor = new Color3(0.075, 0.075, 0.085);
+    this.quirkyBlackMaterial.specularColor = Color3.Black();
+    this.quirkyBlackMaterial.emissiveColor = new Color3(0.012, 0.012, 0.02);
 
     this.particleTexture = new DynamicTexture(
       'particle-texture',
@@ -544,6 +560,18 @@ export class Board3D {
           const container = containers.get(file);
           if (!container) continue;
           metrics.set(file, this.computeMetrics(container, setScale));
+        }
+      }
+
+      if (style === 'quirky-animals') {
+        for (const container of containers.values()) {
+          for (const mesh of container.meshes) {
+            if (mesh.material instanceof PBRMaterial) {
+              mesh.material.metallic = 0;
+              mesh.material.roughness = 1;
+              mesh.material.environmentIntensity = 0;
+            }
+          }
         }
       }
 
@@ -817,6 +845,11 @@ export class Board3D {
     this.lastState = state;
     if (!this.ready) return;
     if (state.boardColor !== this.boardColor) this.setBoardColor(state.boardColor);
+    if (state.fenceModel !== this.fenceModel) {
+      this.fenceModel = state.fenceModel;
+      this.applyFenceModel();
+      this.eyeDecorKey = '';
+    }
     if (state.goban.size !== this.size) this.setBoardSize(state.goban.size);
     if (state.animations !== this.animationsEnabled) {
       this.animationsEnabled = state.animations;
@@ -971,6 +1004,7 @@ export class Board3D {
             height > 0 ? targetHeight / height : 1
           );
           this.eyeContainers.set(kind, container);
+          if (kind === 'fence') this.applyFenceModel();
         } catch (error) {
           this.eyeLoadFailed = true;
           console.warn(`Failed loading eye model [${kind}].`, error);
@@ -983,6 +1017,19 @@ export class Board3D {
       }
     })();
     return this.eyeLoading;
+  }
+
+  private applyFenceModel(): void {
+    const container = this.eyeContainers.get('fence');
+    if (!container) return;
+    for (const mesh of container.meshes) {
+      const material = mesh.material;
+      if (!(material instanceof PBRMaterial)) continue;
+      material.albedoColor =
+        this.fenceModel === 'light'
+          ? new Color3(1.6, 1.5, 1.35)
+          : Color3.White();
+    }
   }
 
   private createEyeDecoration(kind: EyeModelKind): TransformNode | null {
@@ -1019,12 +1066,14 @@ export class Board3D {
 
   private updateEyeDecorations(state: RenderState): void {
     const analysis = this.eyeAnalysis;
-    if (
-      !analysis ||
-      (state.wallModel === 'off' &&
-        state.trueEyeModel === 'off' &&
-        !state.showFalseEyeModels)
-    ) {
+    const needsEyeDecor =
+      state.trueEyeModel !== 'off' ||
+      state.showFalseEyeModels ||
+      state.wallModel === 'seaweed';
+    const fences =
+      state.wallModel === 'fence' ? this.connectedLibertyFences(state.goban) : [];
+
+    if (!needsEyeDecor && fences.length === 0) {
       this.clearEyeDecorations();
       this.eyeDecorKey = '';
       return;
@@ -1032,9 +1081,14 @@ export class Board3D {
 
     const key = [
       state.wallModel,
+      state.fenceModel,
       state.trueEyeModel,
       state.showFalseEyeModels ? 'falseeye' : '',
-      ...analysis.groups.map(
+      ...fences.map(
+        (placement) =>
+          `${placement.x.toFixed(2)}:${placement.z.toFixed(2)}:${placement.angle.toFixed(2)}`
+      ),
+      ...(analysis?.groups ?? []).map(
         (group) => `${group.color}:${group.eyes.join(',')}:${group.pair.join(',')}`
       )
     ].join('|');
@@ -1060,48 +1114,48 @@ export class Board3D {
     this.clearEyeDecorations();
     const n = this.size;
 
-    for (const group of analysis.groups) {
-      if (state.trueEyeModel !== 'off') {
-        for (const eye of group.eyes) {
-          const model = this.createEyeDecoration(state.trueEyeModel);
-          if (!model) continue;
-          const row = Math.floor(eye / n);
-          const col = eye % n;
-          model.position.set(
-            this.worldCoordinateX(col),
-            0.025,
-            this.worldCoordinateZ(row)
-          );
-          this.eyeDecorations.push(model);
-        }
-      }
+    for (const placement of fences) {
+      const model = this.createEyeDecoration('fence');
+      if (!model) continue;
+      model.position.set(placement.x, 0.02, placement.z);
+      model.rotation.y = placement.angle;
+      this.eyeDecorations.push(model);
+    }
 
-      if (state.showFalseEyeModels) {
-        for (const eye of group.falseEyes) {
-          const model = this.createEyeDecoration('falseeye');
-          if (!model) continue;
-          const row = Math.floor(eye / n);
-          const col = eye % n;
-          model.position.set(
-            this.worldCoordinateX(col),
-            0.025,
-            this.worldCoordinateZ(row)
-          );
-          this.eyeDecorations.push(model);
-        }
-      }
-
-      if (state.wallModel !== 'off') {
-        const [first, second] = group.pair;
-        if (state.wallModel === 'fence') {
-          for (const placement of this.fencePlacements(first, second)) {
-            const model = this.createEyeDecoration('fence');
+    if (analysis) {
+      for (const group of analysis.groups) {
+        if (state.trueEyeModel !== 'off') {
+          for (const eye of group.eyes) {
+            const model = this.createEyeDecoration(state.trueEyeModel);
             if (!model) continue;
-            model.position.set(placement.x, 0.02, placement.z);
-            model.rotation.y = placement.angle;
+            const row = Math.floor(eye / n);
+            const col = eye % n;
+            model.position.set(
+              this.worldCoordinateX(col),
+              0.025,
+              this.worldCoordinateZ(row)
+            );
             this.eyeDecorations.push(model);
           }
-        } else {
+        }
+
+        if (state.showFalseEyeModels) {
+          for (const eye of group.falseEyes) {
+            const model = this.createEyeDecoration('falseeye');
+            if (!model) continue;
+            const row = Math.floor(eye / n);
+            const col = eye % n;
+            model.position.set(
+              this.worldCoordinateX(col),
+              0.025,
+              this.worldCoordinateZ(row)
+            );
+            this.eyeDecorations.push(model);
+          }
+        }
+
+        if (state.wallModel === 'seaweed') {
+          const [first, second] = group.pair;
           const firstRow = Math.floor(first / n);
           const firstCol = first % n;
           const secondRow = Math.floor(second / n);
@@ -1114,7 +1168,7 @@ export class Board3D {
           const dz = bz - az;
           const length = Math.hypot(dx, dz) || 1;
 
-          const model = this.createEyeDecoration(state.wallModel);
+          const model = this.createEyeDecoration('seaweed');
           if (model) {
             model.position.set(
               (ax + bx) / 2 - (dz / length) * 0.16,
@@ -1130,25 +1184,54 @@ export class Board3D {
     this.eyeDecorKey = key;
   }
 
-  private fencePlacements(
-    first: number,
-    second: number
+  private connectedLibertyFences(
+    goban: Goban
   ): Array<{ x: number; z: number; angle: number }> {
-    const n = this.size;
-    const firstRow = Math.floor(first / n);
-    const firstCol = first % n;
-    const secondRow = Math.floor(second / n);
-    const secondCol = second % n;
-    const x1 = this.worldCoordinateX(firstCol);
-    const z1 = this.worldCoordinateZ(firstRow);
-    const x2 = this.worldCoordinateX(secondCol);
-    const z2 = this.worldCoordinateZ(secondRow);
-    const angle = Math.atan2(-(z2 - z1), x2 - x1);
+    const n = goban.size;
+    const placements: Array<{ x: number; z: number; angle: number }> = [];
+    const seenGroups = new Uint8Array(goban.area);
+    const seenEdges = new Set<number>();
 
-    return [
-      { x: x1, z: z1, angle },
-      { x: x2, z: z2, angle }
-    ];
+    for (let index = 0; index < goban.area; index++) {
+      const color = goban.board[index];
+      if ((color !== BLACK && color !== WHITE) || seenGroups[index]) continue;
+      const group = goban.groupAt(index);
+      for (const stone of group.stones) seenGroups[stone] = 1;
+      if (group.liberties.size !== 2) continue;
+
+      for (const liberty of group.liberties) {
+        const row = Math.floor(liberty / n);
+        const col = liberty % n;
+        const neighbors: number[] = [];
+        if (col + 1 < n) neighbors.push(liberty + 1);
+        if (row + 1 < n) neighbors.push(liberty + n);
+
+        for (const neighbor of neighbors) {
+          if (!group.liberties.has(neighbor)) continue;
+          const low = Math.min(liberty, neighbor);
+          const high = Math.max(liberty, neighbor);
+          const edgeKey = low * goban.area + high;
+          if (seenEdges.has(edgeKey)) continue;
+          seenEdges.add(edgeKey);
+
+          const neighborRow = Math.floor(neighbor / n);
+          const neighborCol = neighbor % n;
+          const ax = this.worldCoordinateX(col);
+          const az = this.worldCoordinateZ(row);
+          const bx = this.worldCoordinateX(neighborCol);
+          const bz = this.worldCoordinateZ(neighborRow);
+          const dx = bx - ax;
+          const dz = bz - az;
+          placements.push({
+            x: (ax + bx) / 2,
+            z: (az + bz) / 2,
+            angle: Math.atan2(-dz, dx)
+          });
+        }
+      }
+    }
+
+    return placements;
   }
 
   private clearEyeDecorations(): void {
@@ -1493,7 +1576,14 @@ export class Board3D {
     for (const mesh of meshes) {
       if (originalColors) {
         if (color !== playerColor) {
-          mesh.material = color === WHITE ? this.animalWhiteMaterial : this.animalBlackMaterial;
+          mesh.material =
+            this.currentStyle === 'quirky-animals'
+              ? color === WHITE
+                ? this.quirkyWhiteMaterial
+                : this.quirkyBlackMaterial
+              : color === WHITE
+                ? this.animalWhiteMaterial
+                : this.animalBlackMaterial;
         }
       } else {
         mesh.material = color === BLACK ? this.blackMaterial : this.whiteMaterial;

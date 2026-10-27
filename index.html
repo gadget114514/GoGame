@@ -97,6 +97,11 @@
                 <option value="19">19 &times; 19</option>
               </select>
             </label>
+            <label data-i18n-title="rulesTitle" title="Chinese rules: area scoring (stones + territory)."><span data-i18n="rules">Rules</span>
+              <select id="rules">
+                <option value="chinese" data-i18n="rulesChinese" selected>Chinese</option>
+              </select>
+            </label>
             <label><span data-i18n="boardColor">Board Color</span>
               <select id="board-color">
                 <option value="wood" data-i18n="boardWood" selected>Wood</option>
@@ -179,6 +184,13 @@
                 <option value="off" data-i18n="off">Off</option>
                 <option value="seaweed" data-i18n="wallSeaweed">Seaweed</option>
                 <option value="fence" data-i18n="wallFence" selected>Fence</option>
+              </select>
+            </label>
+            <label id="label-fence-model" title="Fence model">
+              <span data-i18n="fenceModel">Fence Model</span>
+              <select id="fence-model">
+                <option value="dark" data-i18n="fenceDark" selected>Fence (Dark)</option>
+                <option value="light" data-i18n="fenceLight">Fence (Light)</option>
               </select>
             </label>
             <label id="label-true-eye-model" title="Model placed on each true eye">

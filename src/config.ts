@@ -2,6 +2,7 @@ import { DEFAULT_KOMI, isBoardSize, type BoardSize } from './game/BoardSize';
 import { detectInitialLanguage, type Language } from './i18n';
 import { isHeatmapTheme, type HeatmapTheme } from './ui/heatmap';
 import { isBoardColor, type BoardColor } from './ui/boardTheme';
+import { isFenceModel, type FenceModel } from './ui/fenceModels';
 import type {
   CaptureEffect,
   DeadStoneStyle,
@@ -11,11 +12,13 @@ import type {
 } from './ui/Board3D';
 
 export type OpponentMode = 'dan' | 'kyu' | 'manual';
+export type Rules = 'chinese';
 export type ViewMode = '3d' | '2d';
 
 export interface GameConfig {
   version: 1;
   boardSize: BoardSize;
+  rules: Rules;
   komi: number;
   opponent: OpponentMode;
   playerSide: 'black' | 'white';
@@ -32,6 +35,7 @@ export interface GameConfig {
   evalGraph: boolean;
   twoEyeHighlight: boolean;
   wallModel: WallModel;
+  fenceModel: FenceModel;
   trueEyeModel: TrueEyeModel;
   falseEyeModels: boolean;
   replaySpeed: number;
@@ -42,6 +46,7 @@ export const CONFIG_KEY = 'gogame:config';
 export const DEFAULT_CONFIG: GameConfig = {
   version: 1,
   boardSize: 9,
+  rules: 'chinese',
   komi: DEFAULT_KOMI[9],
   opponent: 'dan',
   playerSide: 'black',
@@ -58,6 +63,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   evalGraph: true,
   twoEyeHighlight: true,
   wallModel: 'fence',
+  fenceModel: 'dark',
   trueEyeModel: 'trueeye',
   falseEyeModels: true,
   replaySpeed: 1000
@@ -77,6 +83,7 @@ const WALL_MODELS = new Set<WallModel>(['off', 'seaweed', 'fence']);
 const TRUE_EYE_MODELS = new Set<TrueEyeModel>(['off', 'cute', 'trueeye']);
 const LANGUAGES = new Set<Language>(['en', 'ja', 'es']);
 const OPPONENTS = new Set<OpponentMode>(['dan', 'kyu', 'manual']);
+const RULES = new Set<Rules>(['chinese']);
 const SIDES = new Set<'black' | 'white'>(['black', 'white']);
 const VIEWS = new Set<ViewMode>(['3d', '2d']);
 const REPLAY_SPEEDS = new Set([500, 1000, 1500]);
@@ -106,6 +113,7 @@ function sanitize(raw: unknown): GameConfig {
 
   const size = number(value.boardSize, config.boardSize);
   if (isBoardSize(size)) config.boardSize = size;
+  if (RULES.has(value.rules as Rules)) config.rules = value.rules as Rules;
   config.komi = number(value.komi, config.komi, 0);
   if (OPPONENTS.has(value.opponent as OpponentMode)) {
     config.opponent = value.opponent as OpponentMode;
@@ -131,6 +139,9 @@ function sanitize(raw: unknown): GameConfig {
   if (VIEWS.has(value.view as ViewMode)) config.view = value.view as ViewMode;
   if (WALL_MODELS.has(value.wallModel as WallModel)) {
     config.wallModel = value.wallModel as WallModel;
+  }
+  if (isFenceModel(value.fenceModel)) {
+    config.fenceModel = value.fenceModel;
   }
   if (TRUE_EYE_MODELS.has(value.trueEyeModel as TrueEyeModel)) {
     config.trueEyeModel = value.trueEyeModel as TrueEyeModel;
@@ -161,6 +172,8 @@ function readLegacy(): Partial<GameConfig> {
     if (Number.isFinite(komi) && komi >= 0) legacy.komi = komi;
   }
 
+  const rules = storage.getItem('gogame:rules') as Rules | null;
+  if (rules && RULES.has(rules)) legacy.rules = rules;
   const opponent = storage.getItem('gogame:aiLevel') as OpponentMode | null;
   if (opponent && OPPONENTS.has(opponent)) legacy.opponent = opponent;
   const side = storage.getItem('gogame:playerSide') as 'black' | 'white' | null;
@@ -180,6 +193,8 @@ function readLegacy(): Partial<GameConfig> {
 
   const wallModel = storage.getItem('gogame:wallModel') as WallModel | null;
   if (wallModel && WALL_MODELS.has(wallModel)) legacy.wallModel = wallModel;
+  const fenceModel = storage.getItem('gogame:fenceModel');
+  if (isFenceModel(fenceModel)) legacy.fenceModel = fenceModel;
   const trueEyeModel = storage.getItem('gogame:trueEyeModel') as TrueEyeModel | null;
   if (trueEyeModel && TRUE_EYE_MODELS.has(trueEyeModel)) {
     legacy.trueEyeModel = trueEyeModel;

@@ -2,6 +2,9 @@ export type Language = 'en' | 'ja' | 'es';
 
 export interface Translations {
   board: string;
+  rules: string;
+  rulesChinese: string;
+  rulesTitle: string;
   boardColor: string;
   boardWood: string;
   boardGreen: string;
@@ -43,6 +46,9 @@ export interface Translations {
   wallModel: string;
   wallSeaweed: string;
   wallFence: string;
+  fenceModel: string;
+  fenceDark: string;
+  fenceLight: string;
   trueEyeModel: string;
   trueEyeCute: string;
   trueEyeTrue: string;
@@ -119,6 +125,9 @@ export interface Translations {
 const DICTIONARIES: Record<Language, Translations> = {
   en: {
     board: 'Board',
+    rules: 'Rules',
+    rulesChinese: 'Chinese',
+    rulesTitle: 'Chinese rules: area scoring counts stones and surrounded territory.',
     boardColor: 'Board Color',
     boardWood: 'Wood',
     boardGreen: 'Green',
@@ -163,6 +172,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     wallModel: 'Wall',
     wallSeaweed: 'Seaweed',
     wallFence: 'Fence',
+    fenceModel: 'Fence Model',
+    fenceDark: 'Fence (Dark)',
+    fenceLight: 'Fence (Light)',
     trueEyeModel: 'True Eye',
     trueEyeCute: 'Cute Flower',
     trueEyeTrue: 'True Eye Flower',
@@ -234,6 +246,9 @@ const DICTIONARIES: Record<Language, Translations> = {
   },
   ja: {
     board: '盤面',
+    rules: 'ルール',
+    rulesChinese: '中国ルール',
+    rulesTitle: '中国ルール：石と囲んだ地の合計（面積）で計算します。',
     boardColor: '盤面の色',
     boardWood: '木目',
     boardGreen: '緑',
@@ -278,6 +293,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     wallModel: '壁',
     wallSeaweed: '海藻',
     wallFence: 'フェンス',
+    fenceModel: 'フェンスモデル',
+    fenceDark: 'フェンス (ダーク)',
+    fenceLight: 'フェンス (ライト)',
     trueEyeModel: '本眼',
     trueEyeCute: 'かわいい花',
     trueEyeTrue: '本眼の花',
@@ -349,6 +367,9 @@ const DICTIONARIES: Record<Language, Translations> = {
   },
   es: {
     board: 'Tablero',
+    rules: 'Reglas',
+    rulesChinese: 'Chino',
+    rulesTitle: 'Reglas chinas: puntuación por área (piedras y territorio rodeado).',
     boardColor: 'Color del tablero',
     boardWood: 'Madera',
     boardGreen: 'Verde',
@@ -393,6 +414,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     wallModel: 'Muro',
     wallSeaweed: 'Alga',
     wallFence: 'Valla',
+    fenceModel: 'Modelo de valla',
+    fenceDark: 'Valla (oscura)',
+    fenceLight: 'Valla (clara)',
     trueEyeModel: 'Ojo real',
     trueEyeCute: 'Flor cute',
     trueEyeTrue: 'Flor de ojo real',

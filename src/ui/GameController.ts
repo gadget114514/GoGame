@@ -18,12 +18,14 @@ import {
   saveConfig,
   type GameConfig,
   type OpponentMode,
+  type Rules,
   type ViewMode
 } from '../config';
 import { generateSGF, parseSGF } from '../game/sgf';
 import { EvalGraph, type EvalPoint } from './EvalGraph';
 import { isHeatmapTheme, type HeatmapTheme } from './heatmap';
 import { isBoardColor, type BoardColor } from './boardTheme';
+import { isFenceModel, type FenceModel } from './fenceModels';
 import { STYLE_PRESETS } from './stylePresets';
 import thirdpartyText from '../../thirdparty.txt?raw';
 
@@ -31,6 +33,7 @@ interface Elements {
   canvas3d: HTMLCanvasElement;
   canvas2d: HTMLCanvasElement;
   boardSize: HTMLSelectElement;
+  rules: HTMLSelectElement;
   aiLevel: HTMLSelectElement;
   playerSide: HTMLSelectElement;
   pieceStyle: HTMLSelectElement;
@@ -45,6 +48,7 @@ interface Elements {
   toggleEvalGraph: HTMLInputElement;
   toggleEyeHighlight: HTMLInputElement;
   wallModel: HTMLSelectElement;
+  fenceModel: HTMLSelectElement;
   trueEyeModel: HTMLSelectElement;
   toggleFalseEyeModels: HTMLInputElement;
   komi: HTMLInputElement;
@@ -111,6 +115,7 @@ export class GameController {
   private config: GameConfig;
   private goban: Goban;
   private opponent: OpponentMode = 'dan';
+  private rules: Rules = 'chinese';
   private playerSide: 'black' | 'white' = 'black';
   private pieceStyle: PieceStyle = 'quirky-animals';
   private deadStoneStyle: DeadStoneStyle = 'cube';
@@ -136,6 +141,7 @@ export class GameController {
   private animationsEnabled = true;
   private eyeHighlightEnabled = true;
   private wallModel: WallModel = 'fence';
+  private fenceModel: FenceModel = 'dark';
   private trueEyeModel: TrueEyeModel = 'trueeye';
   private falseEyeModelsEnabled = true;
   private hoverIndex: number | null = null;
@@ -158,6 +164,7 @@ export class GameController {
       canvas3d: requireElement('scene3d'),
       canvas2d: requireElement('scene2d'),
       boardSize: requireElement('board-size'),
+      rules: requireElement('rules'),
       aiLevel: requireElement('ai-level'),
       playerSide: requireElement('player-side'),
       pieceStyle: requireElement('piece-style'),
@@ -172,6 +179,7 @@ export class GameController {
       toggleEvalGraph: requireElement('toggle-eval-graph'),
       toggleEyeHighlight: requireElement('toggle-eye-highlight'),
       wallModel: requireElement('wall-model'),
+      fenceModel: requireElement('fence-model'),
       trueEyeModel: requireElement('true-eye-model'),
       toggleFalseEyeModels: requireElement('toggle-false-eye-models'),
       komi: requireElement('komi'),
@@ -211,6 +219,7 @@ export class GameController {
 
     this.config = loadConfig();
     this.opponent = this.config.opponent;
+    this.rules = this.config.rules;
     this.playerSide = this.config.playerSide;
     this.pieceStyle = this.config.pieceStyle;
     this.deadStoneStyle = this.config.deadStoneStyle;
@@ -224,11 +233,13 @@ export class GameController {
     this.evalGraphEnabled = this.config.evalGraph;
     this.eyeHighlightEnabled = this.config.twoEyeHighlight;
     this.wallModel = this.config.wallModel;
+    this.fenceModel = this.config.fenceModel;
     this.trueEyeModel = this.config.trueEyeModel;
     this.falseEyeModelsEnabled = this.config.falseEyeModels;
     this.replaySpeed = this.config.replaySpeed;
 
     this.els.boardSize.value = String(this.config.boardSize);
+    this.els.rules.value = this.rules;
     this.els.komi.value = String(this.config.komi);
     this.els.aiLevel.value = this.opponent;
     this.els.playerSide.value = this.playerSide;
@@ -244,6 +255,7 @@ export class GameController {
     this.els.toggleEvalGraph.checked = this.evalGraphEnabled;
     this.els.toggleEyeHighlight.checked = this.eyeHighlightEnabled;
     this.els.wallModel.value = this.wallModel;
+    this.els.fenceModel.value = this.fenceModel;
     this.els.trueEyeModel.value = this.trueEyeModel;
     this.els.toggleFalseEyeModels.checked = this.falseEyeModelsEnabled;
     this.els.replaySpeed.value = String(this.replaySpeed);
@@ -317,6 +329,10 @@ export class GameController {
     this.els.view.addEventListener('click', () => this.toggleView());
 
     this.els.boardSize.addEventListener('change', () => this.changeBoardSize());
+    this.els.rules.addEventListener('change', () => {
+      this.rules = this.els.rules.value === 'chinese' ? 'chinese' : 'chinese';
+      this.persistConfig();
+    });
     this.els.playerSide.addEventListener('change', () => {
       const side = (this.els.playerSide.value as 'black' | 'white') || 'black';
       this.setPlayerSide(side);
@@ -388,6 +404,12 @@ export class GameController {
       const value = this.els.wallModel.value;
       this.wallModel =
         value === 'off' || value === 'seaweed' || value === 'fence' ? value : 'fence';
+      this.persistConfig();
+      this.render();
+    });
+    this.els.fenceModel.addEventListener('change', () => {
+      const value = this.els.fenceModel.value;
+      this.fenceModel = isFenceModel(value) ? value : 'dark';
       this.persistConfig();
       this.render();
     });
@@ -547,6 +569,7 @@ export class GameController {
     this.config = {
       version: 1,
       boardSize: this.goban.size,
+      rules: this.rules,
       komi: this.goban.komi,
       opponent: this.opponent,
       playerSide: this.playerSide,
@@ -563,6 +586,7 @@ export class GameController {
       evalGraph: this.evalGraphEnabled,
       twoEyeHighlight: this.eyeHighlightEnabled,
       wallModel: this.wallModel,
+      fenceModel: this.fenceModel,
       trueEyeModel: this.trueEyeModel,
       falseEyeModels: this.falseEyeModelsEnabled,
       replaySpeed: this.replaySpeed
@@ -1130,6 +1154,7 @@ export class GameController {
       animations: this.animationsEnabled,
       showTwoEyeHighlight: this.eyeHighlightEnabled,
       wallModel: this.wallModel,
+      fenceModel: this.fenceModel,
       trueEyeModel: this.trueEyeModel,
       showFalseEyeModels: this.falseEyeModelsEnabled,
       captureEffect: this.captureEffect
