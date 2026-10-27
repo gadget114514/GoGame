@@ -158,7 +158,8 @@ const PIECE_SCALE_MULTIPLIERS: Partial<
 > = {};
 
 const ANIMAL_SCALE_MULTIPLIERS: Record<string, number> = {
-  Muskrat: 0.7
+  Muskrat: 0.7,
+  Taipan: 0.5
 };
 
 const PIECE_CENTER_OFFSETS: Partial<
