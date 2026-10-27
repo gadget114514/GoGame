@@ -966,7 +966,7 @@ export class Board3D {
     this.eyeAnalysis = wantsEyes ? detectTwoEyes(state.goban) : null;
     this.updateHeat(state);
     this.syncPieces(state);
-    this.updateEyeDecorations(state);
+    if (this.pendingPlacements.size === 0) this.updateEyeDecorations(state);
   }
 
   private updateHeat(state: RenderState): void {
@@ -1113,7 +1113,7 @@ export class Board3D {
         }
       }
 
-      if (this.lastState) {
+      if (this.lastState && this.pendingPlacements.size === 0) {
         this.eyeDecorKey = '';
         this.updateEyeDecorations(this.lastState);
       }
@@ -1993,6 +1993,10 @@ export class Board3D {
       : this.alertForLiberties(state.goban.groupAt(index).liberties.size);
     this.pieces.set(index, { root, rank, color, dead, alert });
     this.animatePieceEntrance(index, root, dramatic);
+    if (this.pendingPlacements.size === 0) {
+      this.eyeDecorKey = '';
+      this.updateEyeDecorations(state);
+    }
 
     const pieceColor = color === WHITE ? WHITE_MOVE_COLOR : BLACK_MOVE_COLOR;
     if (dramatic) {
