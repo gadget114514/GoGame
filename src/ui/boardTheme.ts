@@ -29,10 +29,10 @@ const BOARD_PALETTES: Record<BoardColor, BoardPalette> = {
     coordActive: '#ffd166'
   },
   'dark-green': {
-    surface: '#2f5d3a',
-    rim: '#1d3d26',
-    grid: '#9fbf9f',
-    star: '#7ea882',
+    surface: '#234a2d',
+    rim: '#142c1c',
+    grid: '#8fb393',
+    star: '#6f9a75',
     coord: '#e7f0e4',
     coordActive: '#ffd166'
   },

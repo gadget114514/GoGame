@@ -421,7 +421,7 @@ export class Board3D {
       mainTextureFixedSize: 512,
       blurKernelSize: 48
     });
-    this.glowLayer.intensity = 0.35;
+    this.glowLayer.intensity = 0.75;
     this.glowLayer.addIncludedOnlyMesh(this.lastMoveRing);
     this.glowLayer.addIncludedOnlyMesh(this.lastMoveGlow);
     this.glowLayer.addIncludedOnlyMesh(this.lastMoveBeacon);
@@ -1401,7 +1401,7 @@ export class Board3D {
     const isOpponentMove =
       state.opponentColor !== null && state.goban.board[last] === state.opponentColor;
     this.lastMoveEmphasis = isOpponentMove ? 1.3 : 1;
-    this.glowLayer.intensity = isOpponentMove ? 0.75 : 0.35;
+    this.glowLayer.intensity = 0.75;
 
     this.lastMoveMaterial.emissiveColor.copyFrom(color);
     this.lastMoveGlowMaterial.emissiveColor.copyFrom(color);
