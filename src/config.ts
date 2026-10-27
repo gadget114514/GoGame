@@ -1,5 +1,10 @@
-import { DEFAULT_KOMI, isBoardSize, type BoardSize } from './game/BoardSize';
+import { BOARD_SIZES, DEFAULT_KOMI, isBoardSize, type BoardSize } from './game/BoardSize';
 import { detectInitialLanguage, type Language } from './i18n';
+import {
+  defaultThresholds,
+  isValidRankThresholds,
+  type RankThresholds
+} from './ui/pieceRank';
 import { isHeatmapTheme, type HeatmapTheme } from './ui/heatmap';
 import { isBoardColor, type BoardColor } from './ui/boardTheme';
 import { isFenceModel, type FenceModel } from './ui/fenceModels';
@@ -24,6 +29,7 @@ export interface GameConfig {
   opponent: OpponentMode;
   playerSide: 'black' | 'white';
   pieceStyle: PieceStyle;
+  rankThresholds: Record<BoardSize, RankThresholds>;
   deadStoneStyle: DeadStoneStyle;
   captureEffect: CaptureEffect;
   boardColor: BoardColor;
@@ -52,7 +58,12 @@ export const DEFAULT_CONFIG: GameConfig = {
   komi: DEFAULT_KOMI[9],
   opponent: 'dan',
   playerSide: 'black',
-  pieceStyle: 'quirky-animals',
+  pieceStyle: 'kenney-pets',
+  rankThresholds: {
+    9: defaultThresholds(9),
+    13: defaultThresholds(13),
+    19: defaultThresholds(19)
+  },
   deadStoneStyle: 'cube',
   captureEffect: 'shatter',
   boardColor: 'wood',
@@ -110,6 +121,21 @@ function number(value: unknown, fallback: number, min = -Infinity): number {
     : fallback;
 }
 
+function sanitizeRankThresholds(
+  raw: unknown
+): Record<BoardSize, RankThresholds> {
+  const source =
+    raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const thresholds = {} as Record<BoardSize, RankThresholds>;
+  for (const size of BOARD_SIZES) {
+    const candidate = source[String(size)];
+    thresholds[size] = isValidRankThresholds(candidate)
+      ? ([...candidate] as RankThresholds)
+      : defaultThresholds(size);
+  }
+  return thresholds;
+}
+
 function sanitize(raw: unknown): GameConfig {
   const config: GameConfig = { ...DEFAULT_CONFIG };
   if (!raw || typeof raw !== 'object') return config;
@@ -128,6 +154,7 @@ function sanitize(raw: unknown): GameConfig {
   if (PIECE_STYLES.has(value.pieceStyle as PieceStyle)) {
     config.pieceStyle = value.pieceStyle as PieceStyle;
   }
+  config.rankThresholds = sanitizeRankThresholds(value.rankThresholds);
   if (DEAD_STONE_STYLES.has(value.deadStoneStyle as DeadStoneStyle)) {
     config.deadStoneStyle = value.deadStoneStyle as DeadStoneStyle;
   }

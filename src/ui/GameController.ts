@@ -24,7 +24,11 @@ import {
 } from '../config';
 import { generateSGF, parseSGF } from '../game/sgf';
 import { EvalGraph, type EvalPoint } from './EvalGraph';
-import { rankLegendRanges } from './pieceRank';
+import {
+  defaultThresholds,
+  rankLegendRanges,
+  type RankThresholds
+} from './pieceRank';
 import { PIECE_STYLE_LEGEND_NAMES, type LegendRank } from './pieceLabels';
 import { isHeatmapTheme, type HeatmapTheme } from './heatmap';
 import { isBoardColor, type BoardColor } from './boardTheme';
@@ -41,6 +45,10 @@ interface Elements {
   aiLevel: HTMLSelectElement;
   playerSide: HTMLSelectElement;
   pieceStyle: HTMLSelectElement;
+  thresholds: HTMLInputElement[];
+  thresholdSize: HTMLElement;
+  thresholdError: HTMLElement;
+  resetThresholds: HTMLButtonElement;
   deadStoneStyle: HTMLSelectElement;
   captureEffect: HTMLSelectElement;
   boardColor: HTMLSelectElement;
@@ -122,7 +130,12 @@ export class GameController {
   private rules: Rules = 'chinese';
   private cameraProjection: CameraProjection = 'orthographic';
   private playerSide: 'black' | 'white' = 'black';
-  private pieceStyle: PieceStyle = 'quirky-animals';
+  private pieceStyle: PieceStyle = 'kenney-pets';
+  private rankThresholds: Record<BoardSize, RankThresholds> = {
+    9: defaultThresholds(9),
+    13: defaultThresholds(13),
+    19: defaultThresholds(19)
+  };
   private deadStoneStyle: DeadStoneStyle = 'cube';
   private captureEffect: CaptureEffect = 'shatter';
   private boardColor: BoardColor = 'wood';
@@ -174,6 +187,16 @@ export class GameController {
       aiLevel: requireElement('ai-level'),
       playerSide: requireElement('player-side'),
       pieceStyle: requireElement('piece-style'),
+      thresholds: [
+        requireElement('threshold-king'),
+        requireElement('threshold-queen'),
+        requireElement('threshold-rook'),
+        requireElement('threshold-bishop'),
+        requireElement('threshold-knight')
+      ],
+      thresholdSize: requireElement('threshold-size'),
+      thresholdError: requireElement('threshold-error'),
+      resetThresholds: requireElement('btn-reset-thresholds'),
       deadStoneStyle: requireElement('dead-stone-style'),
       captureEffect: requireElement('capture-effect'),
       boardColor: requireElement('board-color'),
@@ -229,6 +252,7 @@ export class GameController {
     this.cameraProjection = this.config.cameraProjection;
     this.playerSide = this.config.playerSide;
     this.pieceStyle = this.config.pieceStyle;
+    this.rankThresholds = this.config.rankThresholds;
     this.deadStoneStyle = this.config.deadStoneStyle;
     this.captureEffect = this.config.captureEffect;
     this.boardColor = this.config.boardColor;
@@ -290,6 +314,7 @@ export class GameController {
 
     this.board3d.setCameraProjection(this.cameraProjection);
     this.board3d.setBoardSize(size);
+    this.syncThresholdInputs();
     this.updateRankLegend();
     this.board3d.setPerspective(this.playerSide);
     this.setDeadStoneStyle(this.deadStoneStyle);
@@ -354,12 +379,19 @@ export class GameController {
       this.setPlayerSide(side);
     });
     this.els.pieceStyle.addEventListener('change', () => {
-      this.pieceStyle = (this.els.pieceStyle.value as PieceStyle) || 'quirky-animals';
+      this.pieceStyle = (this.els.pieceStyle.value as PieceStyle) || 'kenney-pets';
       this.applyStylePreset(this.pieceStyle);
       void this.board3d.setPieceStyle(this.pieceStyle);
       this.applyLegendStyle();
       this.persistConfig();
     });
+    for (const input of this.els.thresholds) {
+      input.addEventListener('input', () => this.validateThresholdInputs());
+      input.addEventListener('change', () => this.applyThresholdInputs());
+    }
+    this.els.resetThresholds.addEventListener('click', () =>
+      this.resetRankThresholds()
+    );
     this.els.deadStoneStyle.addEventListener('change', () => {
       this.setDeadStoneStyle(this.els.deadStoneStyle.value === 'stone' ? 'stone' : 'cube');
     });
@@ -534,6 +566,9 @@ export class GameController {
       if (key) el.title = t(key);
     });
     this.els.btnPlay.title = this.isPlayingReplay ? t('pause') : t('play');
+    if (!this.els.thresholdError.hidden) {
+      this.els.thresholdError.textContent = t('rankThresholdsError');
+    }
     this.evalGraph.updateLanguage();
     this.applyLegendLabels();
     this.updateViewButtonText();
@@ -599,6 +634,7 @@ export class GameController {
       opponent: this.opponent,
       playerSide: this.playerSide,
       pieceStyle: this.pieceStyle,
+      rankThresholds: this.rankThresholds,
       deadStoneStyle: this.deadStoneStyle,
       captureEffect: this.captureEffect,
       boardColor: this.boardColor,
@@ -621,6 +657,7 @@ export class GameController {
 
   private openSettings(): void {
     this.els.creditsModal.hidden = true;
+    this.syncThresholdInputs();
     this.els.settingsModal.hidden = false;
     this.els.settingsClose.focus();
   }
@@ -668,10 +705,94 @@ export class GameController {
   }
 
   private updateRankLegend(): void {
-    const ranges = rankLegendRanges(this.goban.size);
+    const ranges = rankLegendRanges(
+      this.goban.size,
+      this.rankThresholds[this.goban.size]
+    );
     for (const [key, value] of Object.entries(ranges)) {
       const element = document.getElementById(`range-${key}`);
       if (element) element.textContent = value;
+    }
+  }
+
+  private syncThresholdInputs(): void {
+    const size = this.goban.size;
+    const thresholds = this.rankThresholds[size];
+    this.els.thresholds.forEach((input, index) => {
+      input.value = String(Math.round(thresholds[index] * 100));
+    });
+    this.els.thresholdSize.textContent = `${size}×${size}`;
+    this.clearThresholdError();
+  }
+
+  private readThresholdInputs(): RankThresholds | null {
+    const values = this.els.thresholds.map((input) => Number(input.value));
+    if (
+      !values.every(
+        (value) => Number.isInteger(value) && value >= 1 && value <= 100
+      )
+    ) {
+      return null;
+    }
+    const [king, queen, rook, bishop, knight] = values;
+    if (!(king > queen && queen > rook && rook > bishop && bishop > knight)) {
+      return null;
+    }
+    return [king / 100, queen / 100, rook / 100, bishop / 100, knight / 100];
+  }
+
+  private validateThresholdInputs(): void {
+    if (this.readThresholdInputs()) {
+      this.clearThresholdError();
+    } else {
+      this.showThresholdError();
+    }
+  }
+
+  private applyThresholdInputs(): void {
+    const thresholds = this.readThresholdInputs();
+    if (!thresholds) {
+      this.showThresholdError();
+      return;
+    }
+    const size = this.goban.size;
+    const current = this.rankThresholds[size];
+    if (thresholds.every((value, index) => value === current[index])) {
+      this.clearThresholdError();
+      return;
+    }
+    this.rankThresholds = { ...this.rankThresholds, [size]: thresholds };
+    this.clearThresholdError();
+    this.persistConfig();
+    this.updateRankLegend();
+    this.render();
+  }
+
+  private resetRankThresholds(): void {
+    const size = this.goban.size;
+    this.rankThresholds = {
+      ...this.rankThresholds,
+      [size]: defaultThresholds(size)
+    };
+    this.persistConfig();
+    this.syncThresholdInputs();
+    this.updateRankLegend();
+    this.render();
+  }
+
+  private showThresholdError(): void {
+    this.els.thresholdError.hidden = false;
+    this.els.thresholdError.textContent = t('rankThresholdsError');
+    for (const input of this.els.thresholds) {
+      input.setAttribute('aria-invalid', 'true');
+    }
+  }
+
+  private clearThresholdError(): void {
+    this.els.thresholdError.hidden = true;
+    this.els.thresholdError.textContent = '';
+    for (const input of this.els.thresholds) {
+      input.removeAttribute('aria-invalid');
     }
   }
 
@@ -731,6 +852,7 @@ export class GameController {
     this.evaluation = null;
     this.gameOver = false;
     this.board3d.setBoardSize(size);
+    this.syncThresholdInputs();
     this.updateRankLegend();
     this.board3d.setPerspective(this.playerSide);
     this.board2d.resize();
@@ -1205,6 +1327,7 @@ export class GameController {
       boardColor: this.boardColor,
       animations: this.animationsEnabled,
       showTwoEyeHighlight: this.eyeHighlightEnabled,
+      rankThresholds: this.rankThresholds[this.goban.size],
       wallModel: this.wallModel,
       fenceModel: this.fenceModel,
       trueEyeModel: this.trueEyeModel,
@@ -1384,6 +1507,7 @@ export class GameController {
       this.els.komi.value = String(parsed.komi);
       this.goban = new Goban(size, parsed.komi);
       this.board3d.setBoardSize(size);
+      this.syncThresholdInputs();
       this.updateRankLegend();
       this.board3d.setPerspective('black');
       this.board2d.resize();

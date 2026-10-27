@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { BLACK, WHITE } from '../src/game/Goban';
-import { pieceRank } from '../src/ui/pieceRank';
+import {
+  isValidRankThresholds,
+  pieceRank,
+  rankLegendRanges,
+  type RankThresholds
+} from '../src/ui/pieceRank';
 
 describe('pieceRank', () => {
   it('maps ownership thresholds to ranks', () => {
@@ -55,5 +60,32 @@ describe('pieceRank', () => {
 
   it('does not promote a dead last move', () => {
     expect(pieceRank(-0.2, BLACK, true)).toEqual({ rank: 0, dead: true });
+  });
+
+  it('accepts valid custom thresholds', () => {
+    const custom: RankThresholds = [0.8, 0.7, 0.6, 0.5, 0.4];
+    expect(pieceRank(0.8, BLACK, false, 19, custom).rank).toBe(5);
+    expect(pieceRank(0.7, BLACK, false, 19, custom).rank).toBe(4);
+    expect(pieceRank(0.6, BLACK, false, 19, custom).rank).toBe(3);
+    expect(pieceRank(0.5, BLACK, false, 19, custom).rank).toBe(2);
+    expect(pieceRank(0.4, BLACK, false, 19, custom).rank).toBe(1);
+    expect(pieceRank(0.39, BLACK, false, 19, custom).rank).toBe(0);
+    expect(rankLegendRanges(19, custom)).toEqual({
+      king: '80%+',
+      queen: '70–79%',
+      rook: '60–69%',
+      bishop: '50–59%',
+      knight: '40–49%',
+      pawn: '0–39%'
+    });
+  });
+
+  it('rejects contradictory thresholds', () => {
+    expect(isValidRankThresholds([0.75, 0.6, 0.5, 0.45, 0.36])).toBe(true);
+    expect(isValidRankThresholds([0.6, 0.7, 0.5, 0.45, 0.36])).toBe(false);
+    expect(isValidRankThresholds([0.75, 0.75, 0.5, 0.45, 0.36])).toBe(false);
+    expect(isValidRankThresholds([0.75, 0.6, 0.5, 0.45, 0])).toBe(false);
+    expect(isValidRankThresholds([0.75, 0.6, 0.5, 0.45])).toBe(false);
+    expect(isValidRankThresholds([1.2, 0.6, 0.5, 0.45, 0.36])).toBe(false);
   });
 });

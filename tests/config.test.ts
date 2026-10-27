@@ -5,6 +5,7 @@ import {
   loadConfig,
   saveConfig
 } from '../src/config';
+import { DEFAULT_RANK_THRESHOLDS } from '../src/ui/pieceRank';
 
 function makeStorage(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial));
@@ -36,7 +37,8 @@ describe('game config', () => {
     expect(config.rules).toBe('chinese');
     expect(config.cameraProjection).toBe('orthographic');
     expect(config.komi).toBe(7);
-    expect(config.pieceStyle).toBe('quirky-animals');
+    expect(config.pieceStyle).toBe('kenney-pets');
+    expect(config.rankThresholds[19]).toEqual(DEFAULT_RANK_THRESHOLDS[19]);
     expect(config.heatmapTheme).toBe('green-orange');
     expect(config.captureEffect).toBe('shatter');
     expect(config.fenceModel).toBe('dark');
@@ -59,6 +61,10 @@ describe('game config', () => {
       cameraProjection: 'perspective',
       komi: 7.5,
       pieceStyle: 'animal-bag',
+      rankThresholds: {
+        ...DEFAULT_CONFIG.rankThresholds,
+        13: [0.8, 0.7, 0.6, 0.5, 0.4]
+      },
       boardColor: 'green',
       captureEffect: 'dissolve',
       fenceModel: 'light',
@@ -72,6 +78,7 @@ describe('game config', () => {
     expect(config.boardSize).toBe(13);
     expect(config.komi).toBe(7.5);
     expect(config.pieceStyle).toBe('animal-bag');
+    expect(config.rankThresholds[13]).toEqual([0.8, 0.7, 0.6, 0.5, 0.4]);
     expect(config.boardColor).toBe('green');
     expect(config.captureEffect).toBe('dissolve');
     expect(config.cameraProjection).toBe('perspective');
@@ -79,6 +86,28 @@ describe('game config', () => {
     expect(config.wallModel).toBe('seaweed');
     expect(config.trueEyeModel).toBe('cute');
     expect(config.falseEyeModels).toBe(false);
+  });
+
+  it('falls back to defaults for contradictory rank thresholds', () => {
+    const storage = makeStorage();
+    vi.stubGlobal('localStorage', storage);
+
+    storage.setItem(
+      CONFIG_KEY,
+      JSON.stringify({
+        ...DEFAULT_CONFIG,
+        rankThresholds: {
+          9: [0.8, 0.7, 0.6, 0.5, 0.4],
+          13: [0.8, 0.7, 0.6, 0.5, 0.4],
+          19: [0.4, 0.5, 0.6, 0.7, 0.8]
+        }
+      })
+    );
+
+    const config = loadConfig();
+
+    expect(config.rankThresholds[9]).toEqual([0.8, 0.7, 0.6, 0.5, 0.4]);
+    expect(config.rankThresholds[19]).toEqual(DEFAULT_RANK_THRESHOLDS[19]);
   });
 
   it('migrates legacy settings when no config exists', () => {

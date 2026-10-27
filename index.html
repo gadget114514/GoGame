@@ -134,8 +134,8 @@
                 <option value="clayfoot" data-i18n="pieceClayfoot">Clayfoot Studios</option>
                 <option value="dark-yagami" data-i18n="pieceDarkYagami">Dark Yagami</option>
                 <option value="animal-bag" data-i18n="pieceAnimalBag">Animal Bag</option>
-                <option value="kenney-pets" data-i18n="pieceKenneyPets">Kenney Cube Pets</option>
-                <option value="quirky-animals" data-i18n="pieceQuirkyAnimals" selected>Quirky Animals</option>
+                <option value="kenney-pets" data-i18n="pieceKenneyPets" selected>Kenney Cube Pets</option>
+                <option value="quirky-animals" data-i18n="pieceQuirkyAnimals">Quirky Animals</option>
                 <option value="stones" data-i18n="pieceStones">Traditional Stones</option>
               </select>
             </label>
@@ -145,6 +145,27 @@
                 <option value="stone" data-i18n="deadStone">Go Stone</option>
               </select>
             </label>
+            <div class="settings-section" id="settings-rank-thresholds">
+              <div class="settings-section-title">
+                <span data-i18n="rankThresholds">Piece Strength</span>
+                <span class="settings-hint">
+                  <span id="threshold-size">9×9</span> ·
+                  <span data-i18n="rankThresholdsDead">Dead &lt; 0%</span>
+                </span>
+              </div>
+              <div class="rank-threshold-grid">
+                <label><span data-i18n="king">King</span><span class="threshold-value"><input id="threshold-king" type="number" min="1" max="100" step="1" value="75" /><span>%</span></span></label>
+                <label><span data-i18n="queen">Queen</span><span class="threshold-value"><input id="threshold-queen" type="number" min="1" max="100" step="1" value="60" /><span>%</span></span></label>
+                <label><span data-i18n="rook">Rook</span><span class="threshold-value"><input id="threshold-rook" type="number" min="1" max="100" step="1" value="50" /><span>%</span></span></label>
+                <label><span data-i18n="bishop">Bishop</span><span class="threshold-value"><input id="threshold-bishop" type="number" min="1" max="100" step="1" value="45" /><span>%</span></span></label>
+                <label><span data-i18n="knight">Knight</span><span class="threshold-value"><input id="threshold-knight" type="number" min="1" max="100" step="1" value="36" /><span>%</span></span></label>
+              </div>
+              <div class="settings-section-footer">
+                <span class="settings-hint" data-i18n="rankThresholdsHint">Minimum ownership per rank</span>
+                <button id="btn-reset-thresholds" class="settings-reset" type="button" data-i18n="resetThresholds">Reset</button>
+              </div>
+              <p id="threshold-error" class="settings-error" role="status" hidden></p>
+            </div>
             <label><span data-i18n="captureEffect">Capture Effect</span>
               <select id="capture-effect">
                 <option value="shatter" data-i18n="captureShatter" selected>Shatter</option>

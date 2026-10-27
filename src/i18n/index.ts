@@ -58,6 +58,11 @@ export interface Translations {
   trueEyeCute: string;
   trueEyeTrue: string;
   falseEyeModel: string;
+  rankThresholds: string;
+  rankThresholdsHint: string;
+  rankThresholdsError: string;
+  rankThresholdsDead: string;
+  resetThresholds: string;
   off: string;
   settings: string;
   settingsTitle: string;
@@ -189,6 +194,12 @@ const DICTIONARIES: Record<Language, Translations> = {
     trueEyeCute: 'Cute Flower',
     trueEyeTrue: 'True Eye Flower',
     falseEyeModel: 'False Eye',
+    rankThresholds: 'Piece Strength',
+    rankThresholdsHint: 'Minimum ownership per rank',
+    rankThresholdsError:
+      'Enter descending values: King > Queen > Rook > Bishop > Knight > 0 (1–100%).',
+    rankThresholdsDead: 'Dead < 0%',
+    resetThresholds: 'Reset',
     off: 'Off',
     settings: 'Settings',
     settingsTitle: 'Game settings',
@@ -315,6 +326,12 @@ const DICTIONARIES: Record<Language, Translations> = {
     trueEyeCute: 'かわいい花',
     trueEyeTrue: '本眼の花',
     falseEyeModel: '欠け眼',
+    rankThresholds: '駒の勢力',
+    rankThresholdsHint: '各駒に必要な最低勢力',
+    rankThresholdsError:
+      'King > Queen > Rook > Bishop > Knight > 0 の順で 1–100% を入力してください。',
+    rankThresholdsDead: '死 < 0%',
+    resetThresholds: '初期値',
     off: 'なし',
     settings: '設定',
     settingsTitle: 'ゲーム設定',
@@ -441,6 +458,12 @@ const DICTIONARIES: Record<Language, Translations> = {
     trueEyeCute: 'Flor cute',
     trueEyeTrue: 'Flor de ojo real',
     falseEyeModel: 'Ojo falso',
+    rankThresholds: 'Fuerza de pieza',
+    rankThresholdsHint: 'Posesión mínima por pieza',
+    rankThresholdsError:
+      'Introduce valores descendentes: Rey > Reina > Torre > Alfil > Caballo > 0 (1–100 %).',
+    rankThresholdsDead: 'Muerta < 0%',
+    resetThresholds: 'Restablecer',
     off: 'Ninguno',
     settings: 'Ajustes',
     settingsTitle: 'Ajustes del juego',

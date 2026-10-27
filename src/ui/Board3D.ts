@@ -34,7 +34,7 @@ import { detectTwoEyes, type EyeAnalysis } from '../game/eyes';
 import { heatColor, type HeatmapTheme } from './heatmap';
 import { boardPalette, type BoardColor } from './boardTheme';
 import type { FenceModel } from './fenceModels';
-import { pieceRank } from './pieceRank';
+import { pieceRank, type RankThresholds } from './pieceRank';
 
 export type PieceStyle =
   | 'clayfoot'
@@ -57,6 +57,7 @@ export interface RenderState {
   boardColor: BoardColor;
   animations: boolean;
   showTwoEyeHighlight: boolean;
+  rankThresholds: RankThresholds;
   wallModel: WallModel;
   fenceModel: FenceModel;
   trueEyeModel: TrueEyeModel;
@@ -239,7 +240,7 @@ export class Board3D {
 
   private boardColor: BoardColor = 'wood';
   private fenceModel: FenceModel = 'dark';
-  private currentStyle: PieceStyle = 'quirky-animals';
+  private currentStyle: PieceStyle = 'kenney-pets';
   private deadStoneStyle: DeadStoneStyle = 'cube';
   private perspective: 'black' | 'white' = 'black';
   private directional: DirectionalLight;
@@ -478,7 +479,7 @@ export class Board3D {
     }
     this.engine.runRenderLoop(() => this.scene.render());
 
-    void this.setPieceStyle('quirky-animals');
+    void this.setPieceStyle('kenney-pets');
   }
 
   setCameraProjection(projection: CameraProjection): void {
@@ -1414,7 +1415,13 @@ export class Board3D {
 
   private rankFor(index: number, color: number, state: RenderState): { rank: number; dead: boolean } {
     const ownership = state.evaluation?.ownership[index] ?? 0;
-    return pieceRank(ownership, color, index === state.goban.lastMove, state.goban.size);
+    return pieceRank(
+      ownership,
+      color,
+      index === state.goban.lastMove,
+      state.goban.size,
+      state.rankThresholds
+    );
   }
 
   private countGroupLiberties(goban: Goban): Map<number, number> {
