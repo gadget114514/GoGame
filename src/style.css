@@ -461,6 +461,71 @@ canvas[hidden],
   cursor: crosshair;
 }
 
+.credits-modal {
+  padding: 18px;
+}
+
+.credits-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(860px, 94vw);
+  max-height: min(82vh, 760px);
+  background: linear-gradient(180deg, #241a13, #17110d);
+  border: 1px solid #5a4130;
+  border-radius: 10px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.62);
+  overflow: hidden;
+}
+
+.credits-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 16px;
+  background: rgba(14, 10, 7, 0.6);
+  border-bottom: 1px solid #4a3424;
+}
+
+.credits-header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.03em;
+}
+
+.credits-close {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid #5a4130;
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.credits-close:hover {
+  border-color: var(--accent);
+  background: rgba(217, 160, 102, 0.12);
+}
+
+#credits-content {
+  margin: 0;
+  padding: 16px 20px 22px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-family: "Cascadia Mono", "Consolas", "SFMono-Regular", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 @media (max-width: 640px) {
   #toolbar {
     padding: 8px;

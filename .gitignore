@@ -150,3 +150,14 @@ vite.config.ts.timestamp-*
 
 # Electron build output
 release/
+
+# Source asset archives
+3d/*.zip
+
+# Unused Kenney source formats
+3d/kenney_cube-pets_1.0/Models/FBX format/
+3d/kenney_cube-pets_1.0/Models/OBJ format/
+3d/kenney_cube-pets_1.0/Previews/
+3d/kenney_cube-pets_1.0/*.url
+3d/kenney_cube-pets_1.0/Overview.html
+3d/kenney_cube-pets_1.0/Preview.png

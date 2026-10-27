@@ -1,0 +1,41 @@
+GoGame 3D - Third-party credits
+================================
+
+3D chess piece assets
+---------------------
+Clayfoot Studios - Low-Poly chess pieces, board, and timer (version 1.0)
+Dark Yagami - 3D Chess Pack - Free
+Animal Bag by nevabriliant
+  https://sketchfab.com/3d-models/animal-bag-8a600090e9ed41669a08c45eeec10915
+  Licensed under CC-BY-4.0: https://creativecommons.org/licenses/by/4.0/
+Kenney Cube Pets by Kenney
+  https://www.kenney.nl
+  Licensed under CC0: https://creativecommons.org/publicdomain/zero/1.0/
+Quirky Series - Free Animals Pack
+  See the original asset package for license and attribution information.
+
+Two-eye marker assets
+---------------------
+Sea Weed by rkuhlf
+  https://sketchfab.com/3d-models/sea-weed-d97c596b189845b681cc8eef8a3ab429
+  Licensed under CC-BY-4.0: https://creativecommons.org/licenses/by/4.0/
+Fense-ver2-dark by Pixel
+  https://sketchfab.com/3d-models/fense-ver2-dark-16f86ad52a784369aaa1a3027f4d0610
+  Licensed under CC-BY-4.0: https://creativecommons.org/licenses/by/4.0/
+cute cartoon flower by pikabuka6
+  https://sketchfab.com/3d-models/cute-cartoon-flower-12cd7f90c8414c4fbd44e602ac0ba9af
+  Licensed under CC-BY-4.0: https://creativecommons.org/licenses/by/4.0/
+Flower by neutralize
+  https://sketchfab.com/3d-models/flower-43d7b5abbb10486cb091773d5dd99067
+  Licensed under CC-BY-4.0: https://creativecommons.org/licenses/by/4.0/
+falseeye_weed.glb is based on Sea Weed by rkuhlf (see above).
+
+AI and rendering
+----------------
+KataGo - https://github.com/lightvector/KataGo
+TensorFlow.js - https://www.tensorflow.org/js
+Babylon.js - https://www.babylonjs.com
+@gltf-transform - https://gltf-transform.dev
+fbx2gltf - https://github.com/facebookincubator/FBX2glTF
+
+See the respective project and asset licenses for full terms.

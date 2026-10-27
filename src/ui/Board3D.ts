@@ -21,10 +21,17 @@ import '@babylonjs/loaders/glTF';
 import { BLACK, WHITE, type Goban } from '../game/Goban';
 import { starPoints, COORD_LETTERS, type BoardSize } from '../game/BoardSize';
 import type { Evaluation } from '../ai/KataGoEngine';
+import { detectTwoEyes, type EyeAnalysis } from '../game/eyes';
 import { heatColor } from './heatmap';
 import { pieceRank } from './pieceRank';
 
-export type PieceStyle = 'clayfoot' | 'dark-yagami' | 'stones';
+export type PieceStyle =
+  | 'clayfoot'
+  | 'dark-yagami'
+  | 'animal-bag'
+  | 'kenney-pets'
+  | 'quirky-animals'
+  | 'stones';
 export type DeadStoneStyle = 'cube' | 'stone';
 
 export interface RenderState {
@@ -33,7 +40,15 @@ export interface RenderState {
   moveWeights: Map<number, number>;
   opponentColor: number | null;
   showHeatmap: boolean;
+  showTwoEyeHighlight: boolean;
+  wallModel: WallModel;
+  trueEyeModel: TrueEyeModel;
+  showFalseEyeModels: boolean;
 }
+
+export type WallModel = 'off' | 'seaweed' | 'fence';
+export type TrueEyeModel = 'off' | 'cute' | 'trueeye';
+type EyeModelKind = 'seaweed' | 'fence' | 'cute' | 'trueeye' | 'falseeye';
 
 interface PieceHandle {
   root: TransformNode;
@@ -51,10 +66,54 @@ interface PendingPlacement {
 const PIECE_FILES = ['pawn', 'knight', 'bishop', 'rook', 'queen', 'king'] as const;
 type PieceFile = (typeof PIECE_FILES)[number];
 
+const STYLE_FOLDERS: Record<Exclude<PieceStyle, 'stones'>, string> = {
+  clayfoot: 'assets/chess/clayfoot/',
+  'dark-yagami': 'assets/chess/dark-yagami/',
+  'animal-bag': 'assets/chess/animal-bag/',
+  'kenney-pets': 'assets/chess/kenney-pets/',
+  'quirky-animals': 'assets/chess/quirky-animals/'
+};
+
+const ORIGINAL_COLOR_STYLES = new Set<PieceStyle>([
+  'animal-bag',
+  'kenney-pets',
+  'quirky-animals'
+]);
+
+const PIECE_TARGET_HEIGHTS: Record<PieceFile, number> = {
+  pawn: 0.56,
+  knight: 0.76,
+  bishop: 0.86,
+  rook: 0.94,
+  queen: 1.04,
+  king: 1.12
+};
+
 const SPACING = 1;
 const TEXTURE_SIZE = 1024;
 const BLACK_MOVE_COLOR = new Color3(1.0, 0.58, 0.12);
 const WHITE_MOVE_COLOR = new Color3(0.12, 0.78, 1.0);
+const EYE_MODEL_FILES: Record<EyeModelKind, string> = {
+  seaweed: 'sea_weed.glb',
+  fence: 'fense-ver2-dark.glb',
+  cute: 'cute_cartoon_flower.glb',
+  trueeye: 'trueeye_flower.glb',
+  falseeye: 'falseeye_weed.glb'
+};
+const EYE_MODEL_FOLDERS: Record<EyeModelKind, string> = {
+  seaweed: 'assets/wall/',
+  fence: 'assets/wall/',
+  cute: 'assets/eye/',
+  trueeye: 'assets/eye/',
+  falseeye: 'assets/eye/'
+};
+const EYE_MODEL_HEIGHTS: Record<EyeModelKind, number> = {
+  seaweed: 1.2,
+  fence: 1.1,
+  cute: 0.5,
+  trueeye: 0.55,
+  falseeye: 1.2
+};
 
 export class Board3D {
   private engine: Engine;
@@ -65,6 +124,8 @@ export class Board3D {
   private starMaterial: StandardMaterial;
   private blackMaterial: StandardMaterial;
   private whiteMaterial: StandardMaterial;
+  private animalWhiteMaterial: StandardMaterial;
+  private animalBlackMaterial: StandardMaterial;
 
   private boardNodes: Node[] = [];
   private boardMesh: Mesh | null = null;
@@ -73,15 +134,25 @@ export class Board3D {
   private coordPlane: Mesh | null = null;
   private coordTexture: DynamicTexture | null = null;
 
-  private currentStyle: PieceStyle = 'clayfoot';
+  private currentStyle: PieceStyle = 'quirky-animals';
   private deadStoneStyle: DeadStoneStyle = 'cube';
   private perspective: 'black' | 'white' = 'black';
   private directional: DirectionalLight;
   private styleContainers = new Map<PieceStyle, Map<PieceFile, AssetContainer>>();
-  private styleScales = new Map<PieceStyle, number>();
+  private styleScales = new Map<PieceStyle, Map<PieceFile, number>>();
+  private styleLoading = new Map<PieceStyle, Promise<void>>();
   private pieces = new Map<number, PieceHandle>();
   private fallback = false;
   private lastState: RenderState | null = null;
+
+  private eyeContainers = new Map<EyeModelKind, AssetContainer>();
+  private eyeScales = new Map<EyeModelKind, number>();
+  private eyeLoading: Promise<void> | null = null;
+  private eyeLoadFailed = false;
+  private eyeDecorations: TransformNode[] = [];
+  private eyeDecorKey = '';
+  private eyeAnalysis: EyeAnalysis | null = null;
+  private eyeModelSeed = 0;
 
   private particleTexture: DynamicTexture;
   private lastMoveMaterial: StandardMaterial;
@@ -155,6 +226,18 @@ export class Board3D {
     this.whiteMaterial.specularColor = new Color3(0.6, 0.6, 0.6);
     this.whiteMaterial.specularPower = 56;
     this.whiteMaterial.emissiveColor = new Color3(0.05, 0.048, 0.045);
+
+    this.animalWhiteMaterial = new StandardMaterial('animal-white', this.scene);
+    this.animalWhiteMaterial.diffuseColor = new Color3(0.95, 0.94, 0.9);
+    this.animalWhiteMaterial.specularColor = new Color3(0.35, 0.35, 0.35);
+    this.animalWhiteMaterial.specularPower = 32;
+    this.animalWhiteMaterial.emissiveColor = new Color3(0.045, 0.044, 0.04);
+
+    this.animalBlackMaterial = new StandardMaterial('animal-black', this.scene);
+    this.animalBlackMaterial.diffuseColor = new Color3(0.075, 0.075, 0.085);
+    this.animalBlackMaterial.specularColor = new Color3(0.45, 0.45, 0.5);
+    this.animalBlackMaterial.specularPower = 48;
+    this.animalBlackMaterial.emissiveColor = new Color3(0.012, 0.012, 0.02);
 
     this.particleTexture = new DynamicTexture(
       'particle-texture',
@@ -252,7 +335,7 @@ export class Board3D {
     window.addEventListener('resize', this.resize);
     this.engine.runRenderLoop(() => this.scene.render());
 
-    void this.setPieceStyle('clayfoot');
+    void this.setPieceStyle('quirky-animals');
   }
 
   setPerspective(side: 'black' | 'white'): void {
@@ -277,6 +360,10 @@ export class Board3D {
       }
     }
     if (this.lastState) {
+      if (ORIGINAL_COLOR_STYLES.has(this.currentStyle)) {
+        this.pieces.forEach((piece) => piece.root.dispose());
+        this.pieces.clear();
+      }
       this.update(this.lastState);
     } else {
       this.drawCoordinates(null);
@@ -295,15 +382,28 @@ export class Board3D {
     this.pieces.forEach((piece) => piece.root.dispose());
     this.pieces.clear();
     if (this.lastState) {
-      this.syncPieces(this.lastState);
+      this.update(this.lastState);
     }
   }
 
-  private async ensureStyleLoaded(style: PieceStyle): Promise<void> {
-    if (this.styleContainers.has(style) || style === 'stones') return;
+  private ensureStyleLoaded(style: PieceStyle): Promise<void> {
+    if (this.styleContainers.has(style) || style === 'stones') {
+      return Promise.resolve();
+    }
+    const existing = this.styleLoading.get(style);
+    if (existing) return existing;
+
+    const promise = this.loadStyle(style).finally(() => {
+      this.styleLoading.delete(style);
+    });
+    this.styleLoading.set(style, promise);
+    return promise;
+  }
+
+  private async loadStyle(style: PieceStyle): Promise<void> {
     const base = import.meta.env.BASE_URL || './';
     const baseUrl = base.endsWith('/') ? base : `${base}/`;
-    const folder = style === 'clayfoot' ? 'assets/chess/clayfoot/' : 'assets/chess/dark-yagami/';
+    const folder = STYLE_FOLDERS[style as Exclude<PieceStyle, 'stones'>];
     const root = `${baseUrl}${folder}`;
     const fallbackRoot = `${baseUrl}assets/chess/`;
 
@@ -327,20 +427,38 @@ export class Board3D {
         containers.set(file, container);
       }
 
-      // Compute uniform scale so Queen is ~1.05 high
-      const queenContainer = containers.get('queen');
-      let setScale = 1.0;
-      if (queenContainer) {
-        const qEntries = queenContainer.instantiateModelsToScene(undefined, false);
-        const qRoot = qEntries.rootNodes[0] as TransformNode;
-        const { min, max } = qRoot.getHierarchyBoundingVectors(true);
-        const qHeight = max.y - min.y;
-        if (qHeight > 0) {
-          setScale = 1.05 / qHeight;
+      const scales = new Map<PieceFile, number>();
+      if (ORIGINAL_COLOR_STYLES.has(style)) {
+        for (const file of PIECE_FILES) {
+          const container = containers.get(file);
+          if (!container) continue;
+          const entries = container.instantiateModelsToScene(undefined, false);
+          const rootNode = entries.rootNodes[0] as TransformNode | undefined;
+          if (rootNode) {
+            const { min, max } = rootNode.getHierarchyBoundingVectors(true);
+            const height = max.y - min.y;
+            if (height > 0) scales.set(file, PIECE_TARGET_HEIGHTS[file] / height);
+          }
+          entries.rootNodes.forEach((node) => node.dispose());
         }
-        qEntries.rootNodes.forEach((n) => n.dispose());
+      } else {
+        // Compute uniform scale so Queen is ~1.05 high
+        const queenContainer = containers.get('queen');
+        let setScale = 1.0;
+        if (queenContainer) {
+          const qEntries = queenContainer.instantiateModelsToScene(undefined, false);
+          const qRoot = qEntries.rootNodes[0] as TransformNode;
+          const { min, max } = qRoot.getHierarchyBoundingVectors(true);
+          const qHeight = max.y - min.y;
+          if (qHeight > 0) {
+            setScale = 1.05 / qHeight;
+          }
+          qEntries.rootNodes.forEach((n) => n.dispose());
+        }
+        for (const file of PIECE_FILES) scales.set(file, setScale);
       }
-      this.styleScales.set(style, setScale);
+
+      this.styleScales.set(style, scales);
       this.styleContainers.set(style, containers);
     } catch (error) {
       console.warn(`Failed loading piece style [${style}], using fallback.`, error);
@@ -373,6 +491,9 @@ export class Board3D {
     this.coordTexture = null;
     this.pieces.forEach((piece) => piece.root.dispose());
     this.pieces.clear();
+    this.clearEyeDecorations();
+    this.eyeDecorKey = '';
+    this.eyeAnalysis = null;
     this.buildBoard();
   }
 
@@ -501,8 +622,15 @@ export class Board3D {
     this.lastState = state;
     if (!this.ready) return;
     if (state.goban.size !== this.size) this.setBoardSize(state.goban.size);
+    const wantsEyes =
+      state.showTwoEyeHighlight ||
+      state.wallModel !== 'off' ||
+      state.trueEyeModel !== 'off' ||
+      state.showFalseEyeModels;
+    this.eyeAnalysis = wantsEyes ? detectTwoEyes(state.goban) : null;
     this.updateHeat(state);
     this.syncPieces(state);
+    this.updateEyeDecorations(state);
   }
 
   private updateHeat(state: RenderState): void {
@@ -531,7 +659,271 @@ export class Board3D {
         }
       }
     }
+
+    if (state.showTwoEyeHighlight && this.eyeAnalysis) {
+      this.drawTwoEyeHighlights(
+        context as unknown as CanvasRenderingContext2D,
+        n,
+        cell,
+        isWhite,
+        this.eyeAnalysis
+      );
+    }
+
     texture.update(false);
+  }
+
+  private drawTwoEyeHighlights(
+    context: CanvasRenderingContext2D,
+    n: number,
+    cell: number,
+    isWhite: boolean,
+    analysis: EyeAnalysis
+  ): void {
+    const point = (index: number) => {
+      const row = Math.floor(index / n);
+      const col = index % n;
+      const drawCol = isWhite ? n - 1 - col : col;
+      const drawRow = isWhite ? n - 1 - row : row;
+      return {
+        x: (drawCol + 0.5) * cell,
+        y: (drawRow + 0.5) * cell
+      };
+    };
+
+    context.lineCap = 'round';
+    for (const group of analysis.groups) {
+      const strong =
+        group.color === WHITE ? 'rgba(44, 214, 255, 0.96)' : 'rgba(255, 174, 38, 0.96)';
+      const glow =
+        group.color === WHITE ? 'rgba(190, 246, 255, 0.72)' : 'rgba(255, 225, 150, 0.72)';
+      const pairStart = point(group.pair[0]);
+      const pairEnd = point(group.pair[1]);
+
+      context.beginPath();
+      context.moveTo(pairStart.x, pairStart.y);
+      context.lineTo(pairEnd.x, pairEnd.y);
+      context.strokeStyle = glow;
+      context.lineWidth = cell * 0.15;
+      context.stroke();
+
+      for (const eye of group.eyes) {
+        const { x, y } = point(eye);
+        context.beginPath();
+        context.arc(x, y, cell * 0.38, 0, Math.PI * 2);
+        context.strokeStyle = glow;
+        context.lineWidth = cell * 0.11;
+        context.stroke();
+        context.beginPath();
+        context.arc(x, y, cell * 0.27, 0, Math.PI * 2);
+        context.fillStyle = strong;
+        context.fill();
+      }
+    }
+
+    for (const [eye, color] of analysis.falseEyeOwner) {
+      const strong = color === WHITE ? 'rgba(44, 214, 255, 0.98)' : 'rgba(255, 154, 20, 0.98)';
+      const glow = color === WHITE ? 'rgba(190, 246, 255, 0.8)' : 'rgba(255, 215, 120, 0.8)';
+      const { x, y } = point(eye);
+      const radius = cell * 0.34;
+
+      context.beginPath();
+      context.moveTo(x, y - radius);
+      context.lineTo(x + radius, y);
+      context.lineTo(x, y + radius);
+      context.lineTo(x - radius, y);
+      context.closePath();
+      context.strokeStyle = glow;
+      context.lineWidth = cell * 0.11;
+      context.stroke();
+      context.fillStyle = strong;
+      context.fill();
+    }
+  }
+
+  private async ensureEyeModels(): Promise<void> {
+    if (this.eyeLoading) return this.eyeLoading;
+    this.eyeLoading = (async () => {
+      const base = import.meta.env.BASE_URL || './';
+      const baseUrl = base.endsWith('/') ? base : `${base}/`;
+      for (const kind of ['seaweed', 'fence', 'cute', 'trueeye', 'falseeye'] as const) {
+        if (this.eyeContainers.has(kind)) continue;
+        try {
+          const container = await SceneLoader.LoadAssetContainerAsync(
+            `${baseUrl}${EYE_MODEL_FOLDERS[kind]}`,
+            EYE_MODEL_FILES[kind],
+            this.scene
+          );
+          const entries = container.instantiateModelsToScene(undefined, false);
+          const modelRoot = entries.rootNodes[0] as TransformNode | undefined;
+          let height = 1;
+          if (modelRoot) {
+            const { min, max } = modelRoot.getHierarchyBoundingVectors(true);
+            height = max.y - min.y;
+          }
+          entries.animationGroups.forEach((group) => group.dispose());
+          entries.rootNodes.forEach((node) => node.dispose());
+          this.eyeScales.set(
+            kind,
+            height > 0 ? EYE_MODEL_HEIGHTS[kind] / height : 1
+          );
+          this.eyeContainers.set(kind, container);
+        } catch (error) {
+          this.eyeLoadFailed = true;
+          console.warn(`Failed loading eye model [${kind}].`, error);
+        }
+      }
+
+      if (this.lastState) {
+        this.eyeDecorKey = '';
+        this.updateEyeDecorations(this.lastState);
+      }
+    })();
+    return this.eyeLoading;
+  }
+
+  private createEyeDecoration(kind: EyeModelKind): TransformNode | null {
+    const container = this.eyeContainers.get(kind);
+    if (!container) return null;
+
+    const holder = new TransformNode(`eye-${kind}-${this.eyeModelSeed++}`, this.scene);
+    const entries = container.instantiateModelsToScene(
+      (source) => `${source}-eye-${this.eyeModelSeed++}`,
+      false
+    );
+    entries.animationGroups.forEach((group) => group.dispose());
+    const root = entries.rootNodes[0] as TransformNode | undefined;
+    if (!root) {
+      holder.dispose();
+      return null;
+    }
+
+    root.parent = holder;
+    const scale = this.eyeScales.get(kind) ?? 1;
+    root.scaling.setAll(scale);
+    const { min, max } = root.getHierarchyBoundingVectors(true);
+    root.position.set(
+      -(min.x + max.x) / 2,
+      -min.y,
+      -(min.z + max.z) / 2
+    );
+    for (const mesh of root.getChildMeshes(false)) {
+      mesh.isPickable = false;
+    }
+    if (root instanceof Mesh) root.isPickable = false;
+    return holder;
+  }
+
+  private updateEyeDecorations(state: RenderState): void {
+    const analysis = this.eyeAnalysis;
+    if (
+      !analysis ||
+      (state.wallModel === 'off' &&
+        state.trueEyeModel === 'off' &&
+        !state.showFalseEyeModels)
+    ) {
+      this.clearEyeDecorations();
+      this.eyeDecorKey = '';
+      return;
+    }
+
+    const key = [
+      state.wallModel,
+      state.trueEyeModel,
+      state.showFalseEyeModels ? 'falseeye' : '',
+      ...analysis.groups.map(
+        (group) => `${group.color}:${group.eyes.join(',')}:${group.pair.join(',')}`
+      )
+    ].join('|');
+    if (key === this.eyeDecorKey) return;
+
+    const missing: EyeModelKind[] = [];
+    if (state.wallModel !== 'off' && !this.eyeContainers.has(state.wallModel)) {
+      missing.push(state.wallModel);
+    }
+    if (state.trueEyeModel !== 'off' && !this.eyeContainers.has(state.trueEyeModel)) {
+      missing.push(state.trueEyeModel);
+    }
+    if (state.showFalseEyeModels && !this.eyeContainers.has('falseeye')) {
+      missing.push('falseeye');
+    }
+    if (missing.length > 0) {
+      this.clearEyeDecorations();
+      this.eyeDecorKey = '';
+      if (!this.eyeLoading && !this.eyeLoadFailed) void this.ensureEyeModels();
+      return;
+    }
+
+    this.clearEyeDecorations();
+    const n = this.size;
+
+    for (const group of analysis.groups) {
+      if (state.trueEyeModel !== 'off') {
+        for (const eye of group.eyes) {
+          const model = this.createEyeDecoration(state.trueEyeModel);
+          if (!model) continue;
+          const row = Math.floor(eye / n);
+          const col = eye % n;
+          model.position.set(
+            this.worldCoordinateX(col),
+            0.025,
+            this.worldCoordinateZ(row)
+          );
+          this.eyeDecorations.push(model);
+        }
+      }
+
+      if (state.showFalseEyeModels) {
+        for (const eye of group.falseEyes) {
+          const model = this.createEyeDecoration('falseeye');
+          if (!model) continue;
+          const row = Math.floor(eye / n);
+          const col = eye % n;
+          model.position.set(
+            this.worldCoordinateX(col),
+            0.025,
+            this.worldCoordinateZ(row)
+          );
+          this.eyeDecorations.push(model);
+        }
+      }
+
+      if (state.wallModel !== 'off') {
+        const [first, second] = group.pair;
+        const firstRow = Math.floor(first / n);
+        const firstCol = first % n;
+        const secondRow = Math.floor(second / n);
+        const secondCol = second % n;
+        const ax = this.worldCoordinateX(firstCol);
+        const az = this.worldCoordinateZ(firstRow);
+        const bx = this.worldCoordinateX(secondCol);
+        const bz = this.worldCoordinateZ(secondRow);
+        const dx = bx - ax;
+        const dz = bz - az;
+        const length = Math.hypot(dx, dz) || 1;
+        const offset = state.wallModel === 'seaweed' ? 0.16 : 0;
+
+        const model = this.createEyeDecoration(state.wallModel);
+        if (model) {
+          model.position.set(
+            (ax + bx) / 2 - (dz / length) * offset,
+            0.02,
+            (az + bz) / 2 + (dx / length) * offset
+          );
+          if (state.wallModel === 'fence') {
+            model.rotation.y = Math.atan2(-dz, dx);
+          }
+          this.eyeDecorations.push(model);
+        }
+      }
+    }
+
+    this.eyeDecorKey = key;
+  }
+
+  private clearEyeDecorations(): void {
+    for (const node of this.eyeDecorations) node.dispose();
+    this.eyeDecorations = [];
   }
 
   private syncPieces(state: RenderState): void {
@@ -785,13 +1177,22 @@ export class Board3D {
 
     const meshes = root.getChildMeshes(false);
     if (root instanceof Mesh) meshes.push(root);
+    const originalColors = ORIGINAL_COLOR_STYLES.has(this.currentStyle);
+    const playerColor = this.perspective === 'black' ? BLACK : WHITE;
     for (const mesh of meshes) {
-      mesh.material = color === BLACK ? this.blackMaterial : this.whiteMaterial;
+      if (originalColors) {
+        if (color !== playerColor) {
+          mesh.material = color === WHITE ? this.animalWhiteMaterial : this.animalBlackMaterial;
+        }
+      } else {
+        mesh.material = color === BLACK ? this.blackMaterial : this.whiteMaterial;
+      }
       mesh.isPickable = false;
     }
 
     const { min, max } = root.getHierarchyBoundingVectors(true);
-    const scale = this.styleScales.get(this.currentStyle) ?? 1.05 / (max.y - min.y || 1);
+    const scale =
+      this.styleScales.get(this.currentStyle)?.get(file) ?? 1.05 / (max.y - min.y || 1);
     root.scaling.setAll(scale);
     const centerX = (min.x + max.x) / 2;
     const centerZ = (min.z + max.z) / 2;

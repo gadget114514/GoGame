@@ -11,7 +11,7 @@ predicted territory.
 
 ## Features
 
-- **Board sizes**: 9×9, 13×13, 19×19 (selectable at runtime).
+- **Board sizes**: 9×9, 13×13, 19×19 (selectable at runtime, defaults to 9×9).
 - **AI**: KataGo neural nets converted to TensorFlow.js, bundled as static data.
   - Dan and Kyu levels.
   - 9×9/13×13 use padded inference with the 19×19 net until dedicated per-size
@@ -21,6 +21,12 @@ predicted territory.
   become small cubes in the chess-piece styles (traditional stones stay stones).
 - **Score colorization**: per-intersection ownership heatmap on both the 3D board
   and the 2D fallback.
+- **Two-eye analysis**: highlights true eyes and living false eyes, with optional
+  fence/seaweed wall models and flower/weed eye models.
+- **Piece styles**: Clayfoot, Dark Yagami, Animal Bag, Kenney Cube Pets, Quirky
+  Animals (default), and traditional stones.
+- **Config persistence**: all settings are stored together under
+  `localStorage['gogame:config']` and restored on startup.
 - **2D fallback** view, SGF save/load, pass, undo, evaluation.
 - **PWA** (offline via service worker) and **Electron** packaging.
 
@@ -54,6 +60,7 @@ Converted GLB assets live in `public/assets/chess/`. To regenerate them:
 
 ```bash
 npm run convert:fbx
+node scripts/build-animal-packs.mjs   # Animal Bag / Kenney / Quirky packs
 ```
 
 The script uses `C:/Users/bluen/.local/bin/FBX2glTF-windows-x64.exe` by default;
@@ -86,7 +93,7 @@ src/ai/       KataGo TF.js engine, padded tensor encoding, model registry
 src/ui/       3D (Babylon) and 2D (Canvas) renderers, controller
 electron/     main + preload (app:// protocol, PWA disabled)
 scripts/      model download + FBX→GLB conversion
-public/       models, chess GLBs, icons
+public/       models, chess/eye/wall GLBs, icons
 tests/        Vitest rule/tensor tests
 ```
 

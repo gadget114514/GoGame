@@ -10,6 +10,9 @@ export interface Translations {
   pieces: string;
   pieceClayfoot: string;
   pieceDarkYagami: string;
+  pieceAnimalBag: string;
+  pieceKenneyPets: string;
+  pieceQuirkyAnimals: string;
   pieceStones: string;
   deadStones: string;
   deadCube: string;
@@ -20,6 +23,17 @@ export interface Translations {
   hoverEvalTitle: string;
   heatmap: string;
   heatmapTitle: string;
+  twoEyes: string;
+  wallModel: string;
+  wallSeaweed: string;
+  wallFence: string;
+  trueEyeModel: string;
+  trueEyeCute: string;
+  trueEyeTrue: string;
+  falseEyeModel: string;
+  off: string;
+  credits: string;
+  creditsTitle: string;
   newGame: string;
   newGameTitle: string;
   pass: string;
@@ -95,6 +109,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     pieces: 'Pieces',
     pieceClayfoot: 'Clayfoot Studios',
     pieceDarkYagami: 'Dark Yagami',
+    pieceAnimalBag: 'Animal Bag',
+    pieceKenneyPets: 'Kenney Cube Pets',
+    pieceQuirkyAnimals: 'Quirky Animals',
     pieceStones: 'Traditional Stones',
     deadStones: 'Dead Stones',
     deadCube: 'Cube',
@@ -108,6 +125,17 @@ const DICTIONARIES: Record<Language, Translations> = {
     hoverEvalTitle: 'Realtime ownership preview on mouse hover',
     heatmap: 'Territory',
     heatmapTitle: 'Show predicted territory colors',
+    twoEyes: 'Two Eyes',
+    wallModel: 'Wall',
+    wallSeaweed: 'Seaweed',
+    wallFence: 'Fence',
+    trueEyeModel: 'True Eye',
+    trueEyeCute: 'Cute Flower',
+    trueEyeTrue: 'True Eye Flower',
+    falseEyeModel: 'False Eye',
+    off: 'Off',
+    credits: 'Credits',
+    creditsTitle: 'Third-party credits',
     newGame: 'New',
     newGameTitle: 'Start a new game',
     pass: 'Pass',
@@ -178,6 +206,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     pieces: '駒・碁石',
     pieceClayfoot: 'Clayfoot Studios',
     pieceDarkYagami: 'Dark Yagami',
+    pieceAnimalBag: 'アニマルバッグ',
+    pieceKenneyPets: 'Kenney キューブペット',
+    pieceQuirkyAnimals: 'Quirky アニマル',
     pieceStones: '伝統的な碁石',
     deadStones: '死石',
     deadCube: 'キューブ',
@@ -191,6 +222,17 @@ const DICTIONARIES: Record<Language, Translations> = {
     hoverEvalTitle: 'マウスホバー時のリアルタイム勢力予測',
     heatmap: '地合い',
     heatmapTitle: '予測された地を色付け表示',
+    twoEyes: '二眼',
+    wallModel: '壁',
+    wallSeaweed: '海藻',
+    wallFence: 'フェンス',
+    trueEyeModel: '本眼',
+    trueEyeCute: 'かわいい花',
+    trueEyeTrue: '本眼の花',
+    falseEyeModel: '欠け眼',
+    off: 'なし',
+    credits: 'クレジット',
+    creditsTitle: 'サードパーティのクレジット',
     newGame: '対局開始',
     newGameTitle: '新しい対局を開始',
     pass: 'パス',
@@ -261,6 +303,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     pieces: 'Piezas',
     pieceClayfoot: 'Clayfoot Studios',
     pieceDarkYagami: 'Dark Yagami',
+    pieceAnimalBag: 'Bolsa de animales',
+    pieceKenneyPets: 'Kenney Cube Pets',
+    pieceQuirkyAnimals: 'Animales Quirky',
     pieceStones: 'Piedras tradicionales',
     deadStones: 'Piedras muertas',
     deadCube: 'Cubo',
@@ -274,6 +319,17 @@ const DICTIONARIES: Record<Language, Translations> = {
     hoverEvalTitle: 'Predicción de territorio en tiempo real al pasar el ratón',
     heatmap: 'Territorio',
     heatmapTitle: 'Mostrar colores de territorio previsto',
+    twoEyes: 'Dos ojos',
+    wallModel: 'Muro',
+    wallSeaweed: 'Alga',
+    wallFence: 'Valla',
+    trueEyeModel: 'Ojo real',
+    trueEyeCute: 'Flor cute',
+    trueEyeTrue: 'Flor de ojo real',
+    falseEyeModel: 'Ojo falso',
+    off: 'Ninguno',
+    credits: 'Créditos',
+    creditsTitle: 'Créditos de terceros',
     newGame: 'Nueva',
     newGameTitle: 'Iniciar una nueva partida',
     pass: 'Pasar',

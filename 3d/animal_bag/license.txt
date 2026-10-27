@@ -1,0 +1,11 @@
+Model Information:
+* title:	Animal Bag
+* source:	https://sketchfab.com/3d-models/animal-bag-8a600090e9ed41669a08c45eeec10915
+* author:	nevabriliant (https://sketchfab.com/nevabriliant)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Animal Bag" (https://sketchfab.com/3d-models/animal-bag-8a600090e9ed41669a08c45eeec10915) by nevabriliant (https://sketchfab.com/nevabriliant) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

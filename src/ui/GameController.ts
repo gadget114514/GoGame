@@ -2,11 +2,26 @@ import { Goban, BLACK, WHITE, type MoveRecord } from '../game/Goban';
 import { DEFAULT_KOMI, formatCoordinate, isBoardSize, type BoardSize } from '../game/BoardSize';
 import { KataGoEngine, type Evaluation } from '../ai/KataGoEngine';
 import type { AILevel } from '../ai/registry';
-import { Board3D, type DeadStoneStyle, type PieceStyle, type RenderState } from './Board3D';
+import {
+  Board3D,
+  type DeadStoneStyle,
+  type PieceStyle,
+  type RenderState,
+  type TrueEyeModel,
+  type WallModel
+} from './Board3D';
 import { Board2D } from './Board2D';
-import { detectInitialLanguage, setLanguage, t, type Language } from '../i18n';
+import { getLanguage, setLanguage, t, type Language } from '../i18n';
+import {
+  loadConfig,
+  saveConfig,
+  type GameConfig,
+  type OpponentMode,
+  type ViewMode
+} from '../config';
 import { generateSGF, parseSGF } from '../game/sgf';
 import { EvalGraph, type EvalPoint } from './EvalGraph';
+import thirdpartyText from '../../thirdparty.txt?raw';
 
 interface Elements {
   canvas3d: HTMLCanvasElement;
@@ -20,6 +35,10 @@ interface Elements {
   toggleHoverEval: HTMLInputElement;
   toggleHeatmap: HTMLInputElement;
   toggleEvalGraph: HTMLInputElement;
+  toggleEyeHighlight: HTMLInputElement;
+  wallModel: HTMLSelectElement;
+  trueEyeModel: HTMLSelectElement;
+  toggleFalseEyeModels: HTMLInputElement;
   komi: HTMLInputElement;
   newGame: HTMLButtonElement;
   pass: HTMLButtonElement;
@@ -29,6 +48,10 @@ interface Elements {
   save: HTMLButtonElement;
   load: HTMLButtonElement;
   file: HTMLInputElement;
+  credits: HTMLButtonElement;
+  creditsModal: HTMLElement;
+  creditsContent: HTMLElement;
+  creditsClose: HTMLButtonElement;
   thinking: HTMLElement;
   boot: HTMLElement;
   turn: HTMLElement;
@@ -61,15 +84,11 @@ interface HistorySnapshot {
   evalPoint?: EvalPoint | null;
 }
 
-type ViewMode = '3d' | '2d';
-
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing element #${id}`);
   return element as T;
 }
-
-export type OpponentMode = 'dan' | 'kyu' | 'manual';
 
 export class GameController {
   private readonly engine = new KataGoEngine();
@@ -78,9 +97,11 @@ export class GameController {
   private readonly evalGraph: EvalGraph;
   private readonly els: Elements;
 
+  private config: GameConfig;
   private goban: Goban;
   private opponent: OpponentMode = 'dan';
   private playerSide: 'black' | 'white' = 'black';
+  private pieceStyle: PieceStyle = 'quirky-animals';
   private deadStoneStyle: DeadStoneStyle = 'cube';
   private view: ViewMode = '3d';
   private evaluation: Evaluation | null = null;
@@ -98,6 +119,10 @@ export class GameController {
 
   private hoverEvalEnabled = true;
   private heatmapEnabled = true;
+  private eyeHighlightEnabled = true;
+  private wallModel: WallModel = 'fence';
+  private trueEyeModel: TrueEyeModel = 'trueeye';
+  private falseEyeModelsEnabled = true;
   private hoverIndex: number | null = null;
   private hoverEvaluation: Evaluation | null = null;
   private hoverToken = 0;
@@ -126,6 +151,10 @@ export class GameController {
       toggleHoverEval: requireElement('toggle-hover-eval'),
       toggleHeatmap: requireElement('toggle-heatmap'),
       toggleEvalGraph: requireElement('toggle-eval-graph'),
+      toggleEyeHighlight: requireElement('toggle-eye-highlight'),
+      wallModel: requireElement('wall-model'),
+      trueEyeModel: requireElement('true-eye-model'),
+      toggleFalseEyeModels: requireElement('toggle-false-eye-models'),
       komi: requireElement('komi'),
       newGame: requireElement('btn-new'),
       pass: requireElement('btn-pass'),
@@ -135,6 +164,10 @@ export class GameController {
       save: requireElement('btn-save'),
       load: requireElement('btn-load'),
       file: requireElement('file-sgf'),
+      credits: requireElement('btn-credits'),
+      creditsModal: requireElement('credits-modal'),
+      creditsContent: requireElement('credits-content'),
+      creditsClose: requireElement('btn-close-credits'),
       thinking: requireElement('thinking'),
       boot: requireElement('boot'),
       turn: requireElement('turn'),
@@ -154,53 +187,42 @@ export class GameController {
       evalGraphCanvas: requireElement('eval-graph-canvas')
     };
 
+    this.config = loadConfig();
+    this.opponent = this.config.opponent;
+    this.playerSide = this.config.playerSide;
+    this.pieceStyle = this.config.pieceStyle;
+    this.deadStoneStyle = this.config.deadStoneStyle;
+    this.view = this.config.view;
+    this.hoverEvalEnabled = this.config.hoverEval;
+    this.heatmapEnabled = this.config.heatmap;
+    this.evalGraphEnabled = this.config.evalGraph;
+    this.eyeHighlightEnabled = this.config.twoEyeHighlight;
+    this.wallModel = this.config.wallModel;
+    this.trueEyeModel = this.config.trueEyeModel;
+    this.falseEyeModelsEnabled = this.config.falseEyeModels;
+    this.replaySpeed = this.config.replaySpeed;
+
+    this.els.boardSize.value = String(this.config.boardSize);
+    this.els.komi.value = String(this.config.komi);
+    this.els.aiLevel.value = this.opponent;
+    this.els.playerSide.value = this.playerSide;
+    this.els.pieceStyle.value = this.pieceStyle;
+    this.els.deadStoneStyle.value = this.deadStoneStyle;
+    this.els.languageSelect.value = this.config.language;
+    this.els.toggleHoverEval.checked = this.hoverEvalEnabled;
+    this.els.toggleHeatmap.checked = this.heatmapEnabled;
+    this.els.toggleEvalGraph.checked = this.evalGraphEnabled;
+    this.els.toggleEyeHighlight.checked = this.eyeHighlightEnabled;
+    this.els.wallModel.value = this.wallModel;
+    this.els.trueEyeModel.value = this.trueEyeModel;
+    this.els.toggleFalseEyeModels.checked = this.falseEyeModelsEnabled;
+    this.els.replaySpeed.value = String(this.replaySpeed);
+
     const size = this.readBoardSize();
     const komi = this.readKomi(size);
     this.goban = new Goban(size, komi);
 
-    const savedOpponent = localStorage.getItem('gogame:aiLevel') as OpponentMode;
-    if (savedOpponent === 'kyu' || savedOpponent === 'manual' || savedOpponent === 'dan') {
-      this.opponent = savedOpponent;
-      this.els.aiLevel.value = savedOpponent;
-    } else {
-      const initial = this.els.aiLevel.value;
-      this.opponent = initial === 'kyu' || initial === 'manual' ? initial : 'dan';
-    }
-
-    const savedSide = (localStorage.getItem('gogame:playerSide') as 'black' | 'white') || 'black';
-    this.playerSide = savedSide;
-    this.els.playerSide.value = savedSide;
-
-    const savedStyle = (localStorage.getItem('gogame:pieceStyle') as PieceStyle) || 'clayfoot';
-    this.els.pieceStyle.value = savedStyle;
-
-    const savedDeadStyle = localStorage.getItem('gogame:deadStoneStyle');
-    const initialDeadStyle: DeadStoneStyle =
-      savedDeadStyle === 'cube' || savedDeadStyle === 'stone'
-        ? savedDeadStyle
-        : savedStyle === 'stones'
-          ? 'stone'
-          : 'cube';
-    this.deadStoneStyle = initialDeadStyle;
-    this.els.deadStoneStyle.value = initialDeadStyle;
-
-    this.hoverEvalEnabled = localStorage.getItem('gogame:hoverEval') !== 'false';
-    this.els.toggleHoverEval.checked = this.hoverEvalEnabled;
-
-    this.heatmapEnabled = localStorage.getItem('gogame:heatmap') !== 'false';
-    this.els.toggleHeatmap.checked = this.heatmapEnabled;
-
-    this.evalGraphEnabled = localStorage.getItem('gogame:evalGraph') !== 'false';
-    this.els.toggleEvalGraph.checked = this.evalGraphEnabled;
-
-    const savedView = (localStorage.getItem('gogame:view') as ViewMode) || '3d';
-    this.view = savedView;
-
-    const initialLang = detectInitialLanguage();
-    setLanguage(initialLang);
-    this.els.languageSelect.value = initialLang;
-
-    this.replaySpeed = Number(this.els.replaySpeed.value) || 1000;
+    setLanguage(this.config.language);
 
     this.board3d = new Board3D(this.els.canvas3d);
     this.board2d = new Board2D(this.els.canvas2d);
@@ -216,11 +238,11 @@ export class GameController {
     this.setEvalGraphEnabled(this.evalGraphEnabled);
 
     this.board3d.setBoardSize(size);
-    this.board3d.setPerspective(savedSide);
+    this.board3d.setPerspective(this.playerSide);
     this.setDeadStoneStyle(this.deadStoneStyle);
-    void this.board3d.setPieceStyle(savedStyle);
+    void this.board3d.setPieceStyle(this.pieceStyle);
     this.board2d.resize();
-    this.board2d.setPerspective(savedSide);
+    this.board2d.setPerspective(this.playerSide);
 
     this.board3d.setOnIntersectionClick((index) => void this.humanPlay(index));
     this.board2d.setOnIntersectionClick((index) => void this.humanPlay(index));
@@ -237,7 +259,7 @@ export class GameController {
     this.updateStatus();
 
     const legend = document.getElementById('rank-legend');
-    if (legend && savedStyle === 'stones') {
+    if (legend && this.pieceStyle === 'stones') {
       legend.style.display = 'none';
     }
   }
@@ -270,14 +292,14 @@ export class GameController {
       this.setPlayerSide(side);
     });
     this.els.pieceStyle.addEventListener('change', () => {
-      const style = (this.els.pieceStyle.value as PieceStyle) || 'clayfoot';
-      localStorage.setItem('gogame:pieceStyle', style);
-      void this.board3d.setPieceStyle(style);
-      this.setDeadStoneStyle(style === 'stones' ? 'stone' : 'cube');
+      this.pieceStyle = (this.els.pieceStyle.value as PieceStyle) || 'quirky-animals';
+      void this.board3d.setPieceStyle(this.pieceStyle);
+      this.setDeadStoneStyle(this.pieceStyle === 'stones' ? 'stone' : 'cube');
       const legend = document.getElementById('rank-legend');
       if (legend) {
-        legend.style.display = style === 'stones' ? 'none' : '';
+        legend.style.display = this.pieceStyle === 'stones' ? 'none' : '';
       }
+      this.persistConfig();
     });
     this.els.deadStoneStyle.addEventListener('change', () => {
       this.setDeadStoneStyle(this.els.deadStoneStyle.value === 'stone' ? 'stone' : 'cube');
@@ -286,10 +308,11 @@ export class GameController {
       const lang = this.els.languageSelect.value as Language;
       setLanguage(lang);
       this.applyLanguage();
+      this.persistConfig();
     });
     this.els.toggleHoverEval.addEventListener('change', () => {
       this.hoverEvalEnabled = this.els.toggleHoverEval.checked;
-      localStorage.setItem('gogame:hoverEval', String(this.hoverEvalEnabled));
+      this.persistConfig();
       if (!this.hoverEvalEnabled && this.hoverIndex !== null) {
         this.clearHover();
       }
@@ -299,13 +322,37 @@ export class GameController {
     });
     this.els.toggleHeatmap.addEventListener('change', () => {
       this.heatmapEnabled = this.els.toggleHeatmap.checked;
-      localStorage.setItem('gogame:heatmap', String(this.heatmapEnabled));
+      this.persistConfig();
+      this.render();
+    });
+    this.els.toggleEyeHighlight.addEventListener('change', () => {
+      this.eyeHighlightEnabled = this.els.toggleEyeHighlight.checked;
+      this.persistConfig();
+      this.render();
+    });
+    this.els.wallModel.addEventListener('change', () => {
+      const value = this.els.wallModel.value;
+      this.wallModel =
+        value === 'off' || value === 'seaweed' || value === 'fence' ? value : 'fence';
+      this.persistConfig();
+      this.render();
+    });
+    this.els.trueEyeModel.addEventListener('change', () => {
+      const value = this.els.trueEyeModel.value;
+      this.trueEyeModel =
+        value === 'off' || value === 'cute' || value === 'trueeye' ? value : 'trueeye';
+      this.persistConfig();
+      this.render();
+    });
+    this.els.toggleFalseEyeModels.addEventListener('change', () => {
+      this.falseEyeModelsEnabled = this.els.toggleFalseEyeModels.checked;
+      this.persistConfig();
       this.render();
     });
     this.els.aiLevel.addEventListener('change', () => {
       const val = this.els.aiLevel.value;
       this.opponent = val === 'kyu' || val === 'manual' ? val : 'dan';
-      localStorage.setItem('gogame:aiLevel', this.opponent);
+      this.persistConfig();
       this.hoverCache.clear();
       this.updateStatus();
       if (!this.isManualMode() && this.goban.moves.length === 0 && this.playerSide === 'white' && !this.busy) {
@@ -316,6 +363,7 @@ export class GameController {
     });
     this.els.komi.addEventListener('change', () => {
       this.goban.komi = this.readKomi(this.goban.size);
+      this.persistConfig();
       this.hoverCache.clear();
       this.updateStatus();
       void this.refreshEvaluation(true);
@@ -324,6 +372,11 @@ export class GameController {
     this.els.save.addEventListener('click', () => this.saveSGF());
     this.els.load.addEventListener('click', () => this.els.file.click());
     this.els.file.addEventListener('change', () => void this.loadSGF());
+    this.els.credits.addEventListener('click', () => this.openCredits());
+    this.els.creditsClose.addEventListener('click', () => this.closeCredits());
+    this.els.creditsModal.addEventListener('click', (event) => {
+      if (event.target === this.els.creditsModal) this.closeCredits();
+    });
 
     this.els.btnFirst.addEventListener('click', () => this.firstMove());
     this.els.btnPrev.addEventListener('click', () => this.prevMove());
@@ -342,6 +395,11 @@ export class GameController {
   private wireKeyboard(): void {
     window.addEventListener('keydown', (e) => {
       const activeTag = (document.activeElement?.tagName || '').toLowerCase();
+      if (e.key === 'Escape' && !this.els.creditsModal.hidden) {
+        e.preventDefault();
+        this.closeCredits();
+        return;
+      }
       if (activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea') {
         return;
       }
@@ -382,7 +440,7 @@ export class GameController {
   private setDeadStoneStyle(style: DeadStoneStyle): void {
     this.deadStoneStyle = style;
     this.els.deadStoneStyle.value = style;
-    localStorage.setItem('gogame:deadStoneStyle', style);
+    this.persistConfig();
     this.board3d.setDeadStoneStyle(style);
     document
       .querySelector<HTMLElement>('#rank-legend li.dead .cube')
@@ -391,7 +449,7 @@ export class GameController {
 
   private setEvalGraphEnabled(enabled: boolean): void {
     this.evalGraphEnabled = enabled;
-    localStorage.setItem('gogame:evalGraph', String(enabled));
+    this.persistConfig();
     this.els.toggleEvalGraph.checked = enabled;
     this.evalGraph.setVisible(enabled);
     this.board3d.resize();
@@ -401,13 +459,47 @@ export class GameController {
     }
   }
 
+  private persistConfig(): void {
+    this.config = {
+      version: 1,
+      boardSize: this.goban.size,
+      komi: this.goban.komi,
+      opponent: this.opponent,
+      playerSide: this.playerSide,
+      pieceStyle: this.pieceStyle,
+      deadStoneStyle: this.deadStoneStyle,
+      language: getLanguage(),
+      view: this.view,
+      hoverEval: this.hoverEvalEnabled,
+      heatmap: this.heatmapEnabled,
+      evalGraph: this.evalGraphEnabled,
+      twoEyeHighlight: this.eyeHighlightEnabled,
+      wallModel: this.wallModel,
+      trueEyeModel: this.trueEyeModel,
+      falseEyeModels: this.falseEyeModelsEnabled,
+      replaySpeed: this.replaySpeed
+    };
+    saveConfig(this.config);
+  }
+
+  private openCredits(): void {
+    this.els.creditsContent.textContent = thirdpartyText;
+    this.els.creditsModal.hidden = false;
+    this.els.creditsClose.focus();
+  }
+
+  private closeCredits(): void {
+    this.els.creditsModal.hidden = true;
+    this.els.credits.focus();
+  }
+
   private updateViewButtonText(): void {
     this.els.view.textContent = this.view === '3d' ? t('toggleView2D') : t('toggleView3D');
   }
 
   private readBoardSize(): BoardSize {
     const value = Number(this.els.boardSize.value);
-    return isBoardSize(value) ? value : 19;
+    return isBoardSize(value) ? value : 9;
   }
 
   private readKomi(size: BoardSize): number {
@@ -419,7 +511,7 @@ export class GameController {
   private setPlayerSide(side: 'black' | 'white'): void {
     if (this.playerSide === side) return;
     this.playerSide = side;
-    localStorage.setItem('gogame:playerSide', side);
+    this.persistConfig();
     this.board3d.setPerspective(side);
     this.board2d.setPerspective(side);
     this.updateStatus();
@@ -441,6 +533,7 @@ export class GameController {
     this.board2d.resize();
     this.board2d.setPerspective(this.playerSide);
     this.resetHistory();
+    this.persistConfig();
     this.render();
     this.updateStatus();
     void this.refreshEvaluation(true);
@@ -464,6 +557,7 @@ export class GameController {
     this.board2d.resize();
     this.board2d.setPerspective(this.playerSide);
     this.resetHistory();
+    this.persistConfig();
     this.render();
     this.updateStatus();
     void this.refreshEvaluation(true);
@@ -474,7 +568,7 @@ export class GameController {
 
   private toggleView(): void {
     this.view = this.view === '3d' ? '2d' : '3d';
-    localStorage.setItem('gogame:view', this.view);
+    this.persistConfig();
     this.applyView();
   }
 
@@ -487,7 +581,7 @@ export class GameController {
     this.updateViewButtonText();
     const legend = document.getElementById('rank-legend');
     if (legend) {
-      legend.style.display = !show3d || this.els.pieceStyle.value === 'stones' ? 'none' : '';
+      legend.style.display = !show3d || this.pieceStyle === 'stones' ? 'none' : '';
     }
     if (show3d) {
       this.board3d.resize();
@@ -619,6 +713,7 @@ export class GameController {
 
   setReplaySpeed(speed: number): void {
     this.replaySpeed = speed;
+    this.persistConfig();
     if (this.isPlayingReplay) {
       this.scheduleReplayTick();
     }
@@ -929,10 +1024,19 @@ export class GameController {
       evaluation: activeEval,
       moveWeights: this.moveWeights(),
       opponentColor: this.isManualMode() ? null : this.playerSide === 'black' ? WHITE : BLACK,
-      showHeatmap: this.heatmapEnabled
+      showHeatmap: this.heatmapEnabled,
+      showTwoEyeHighlight: this.eyeHighlightEnabled,
+      wallModel: this.wallModel,
+      trueEyeModel: this.trueEyeModel,
+      showFalseEyeModels: this.falseEyeModelsEnabled
     };
     this.board3d.update(state);
-    this.board2d.update(this.goban, activeEval, this.heatmapEnabled);
+    this.board2d.update(
+      this.goban,
+      activeEval,
+      this.heatmapEnabled,
+      this.eyeHighlightEnabled
+    );
   }
 
   private formatIntersection(index: number): string {

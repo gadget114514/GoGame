@@ -3,6 +3,7 @@ import type { Evaluation } from '../ai/KataGoEngine';
 import { starPoints, COORD_LETTERS } from '../game/BoardSize';
 import { heatColor } from './heatmap';
 import { pieceRank } from './pieceRank';
+import { detectTwoEyes } from '../game/eyes';
 
 export interface Board2DLayout {
   originX: number;
@@ -69,6 +70,7 @@ export class Board2D {
   private goban: Goban | null = null;
   private evaluation: Evaluation | null = null;
   private showHeatmap = true;
+  private showEyeHighlight = false;
   private clickHandler: ((index: number) => void) | null = null;
   private hoverHandler: ((index: number | null) => void) | null = null;
   private hoverIndex: number | null = null;
@@ -122,7 +124,12 @@ export class Board2D {
     this.render();
   };
 
-  update(goban: Goban, evaluation: Evaluation | null, showHeatmap = true): void {
+  update(
+    goban: Goban,
+    evaluation: Evaluation | null,
+    showHeatmap = true,
+    showEyeHighlight = false
+  ): void {
     if (goban.moves.length === this.prevMoveCount + 1 && goban.lastMove !== null) {
       this.lastMoveAnimStartTime = performance.now();
     }
@@ -130,6 +137,7 @@ export class Board2D {
     this.goban = goban;
     this.evaluation = evaluation;
     this.showHeatmap = showHeatmap;
+    this.showEyeHighlight = showEyeHighlight;
     if (goban.size !== this.size) {
       this.size = goban.size;
       this.layout();
@@ -304,6 +312,57 @@ export class Board2D {
           Math.PI * 2
         );
         ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+        ctx.fill();
+      }
+    }
+
+    if (this.showEyeHighlight && this.goban) {
+      const analysis = detectTwoEyes(this.goban);
+      for (const group of analysis.groups) {
+        const strong = group.color === WHITE ? '#2cd6ff' : '#ffae26';
+        const glow = group.color === WHITE ? 'rgba(190,246,255,0.72)' : 'rgba(255,225,150,0.72)';
+        const first = group.pair[0];
+        const second = group.pair[1];
+        const a = this.coordToCanvas(first % this.size, Math.floor(first / this.size));
+        const b = this.coordToCanvas(second % this.size, Math.floor(second / this.size));
+
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.strokeStyle = glow;
+        ctx.lineCap = 'round';
+        ctx.lineWidth = this.cell * 0.15;
+        ctx.stroke();
+
+        for (const eye of group.eyes) {
+          const p = this.coordToCanvas(eye % this.size, Math.floor(eye / this.size));
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, this.cell * 0.36, 0, Math.PI * 2);
+          ctx.strokeStyle = glow;
+          ctx.lineWidth = this.cell * 0.1;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, this.cell * 0.24, 0, Math.PI * 2);
+          ctx.fillStyle = strong;
+          ctx.fill();
+        }
+      }
+
+      for (const [eye, color] of analysis.falseEyeOwner) {
+        const p = this.coordToCanvas(eye % this.size, Math.floor(eye / this.size));
+        const strong = color === WHITE ? '#2cd6ff' : '#ff9a14';
+        const glow = color === WHITE ? 'rgba(190,246,255,0.8)' : 'rgba(255,215,120,0.8)';
+        const radius = this.cell * 0.33;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y - radius);
+        ctx.lineTo(p.x + radius, p.y);
+        ctx.lineTo(p.x, p.y + radius);
+        ctx.lineTo(p.x - radius, p.y);
+        ctx.closePath();
+        ctx.strokeStyle = glow;
+        ctx.lineWidth = this.cell * 0.1;
+        ctx.stroke();
+        ctx.fillStyle = strong;
         ctx.fill();
       }
     }

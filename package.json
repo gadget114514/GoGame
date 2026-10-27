@@ -21,9 +21,12 @@
     "@tensorflow/tfjs": "^4.22.0"
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
     "concurrently": "^9.1.0",
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
+    "fbx2gltf": "^0.9.7-p1",
     "typescript": "^5.7.2",
     "vite": "^5.4.11",
     "vite-plugin-pwa": "^0.21.1",
