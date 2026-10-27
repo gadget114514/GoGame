@@ -1279,7 +1279,7 @@ export class Board3D {
           placements.push({
             x: (ax + bx) / 2,
             z: (az + bz) / 2,
-            angle: Math.atan2(dx, dz)
+            angle: Math.atan2(-dz, dx)
           });
         }
       }
