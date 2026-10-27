@@ -1084,7 +1084,9 @@ export class Board3D {
       state.showFalseEyeModels ||
       state.wallModel === 'seaweed';
     const fences =
-      state.wallModel === 'fence' ? this.connectedLibertyFences(state.goban) : [];
+      state.wallModel === 'fence' && state.fenceModel !== 'none'
+        ? this.connectedLibertyFences(state.goban)
+        : [];
 
     if (!needsEyeDecor && fences.length === 0) {
       this.clearEyeDecorations();
@@ -1108,8 +1110,19 @@ export class Board3D {
     if (key === this.eyeDecorKey) return;
 
     const missing: EyeModelKind[] = [];
-    if (state.wallModel !== 'off' && !this.eyeContainers.has(state.wallModel)) {
+    if (
+      state.wallModel !== 'off' &&
+      state.wallModel !== 'fence' &&
+      !this.eyeContainers.has(state.wallModel)
+    ) {
       missing.push(state.wallModel);
+    }
+    if (
+      state.wallModel === 'fence' &&
+      state.fenceModel !== 'none' &&
+      !this.eyeContainers.has('fence')
+    ) {
+      missing.push('fence');
     }
     if (state.trueEyeModel !== 'off' && !this.eyeContainers.has(state.trueEyeModel)) {
       missing.push(state.trueEyeModel);

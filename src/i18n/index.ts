@@ -50,6 +50,7 @@ export interface Translations {
   fenceModel: string;
   fenceDark: string;
   fenceLight: string;
+  fenceNone: string;
   trueEyeModel: string;
   trueEyeCute: string;
   trueEyeTrue: string;
@@ -177,6 +178,7 @@ const DICTIONARIES: Record<Language, Translations> = {
     fenceModel: 'Fence Model',
     fenceDark: 'Fence (Dark)',
     fenceLight: 'Fence (Light)',
+    fenceNone: 'None',
     trueEyeModel: 'True Eye',
     trueEyeCute: 'Cute Flower',
     trueEyeTrue: 'True Eye Flower',
@@ -299,6 +301,7 @@ const DICTIONARIES: Record<Language, Translations> = {
     fenceModel: 'フェンスモデル',
     fenceDark: 'フェンス (ダーク)',
     fenceLight: 'フェンス (ライト)',
+    fenceNone: 'なし',
     trueEyeModel: '本眼',
     trueEyeCute: 'かわいい花',
     trueEyeTrue: '本眼の花',
@@ -421,6 +424,7 @@ const DICTIONARIES: Record<Language, Translations> = {
     fenceModel: 'Modelo de valla',
     fenceDark: 'Valla (oscura)',
     fenceLight: 'Valla (clara)',
+    fenceNone: 'Ninguno',
     trueEyeModel: 'Ojo real',
     trueEyeCute: 'Flor cute',
     trueEyeTrue: 'Flor de ojo real',
