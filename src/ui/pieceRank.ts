@@ -9,7 +9,7 @@ import type { BoardSize } from '../game/BoardSize';
 export const RANK_THRESHOLDS: Record<BoardSize, readonly [number, number, number, number, number, number]> = {
   9: [0.75, 0.66, 0.52, 0.48, 0.46, 0.4],
   13: [0.75, 0.66, 0.5, 0.46, 0.44, 0.4],
-  19: [0.65, 0.6, 0.48, 0.46, 0.4, 0]
+  19: [0.75, 0.6, 0.5, 0.45, 0.36, 0]
 };
 
 export interface PieceRank {

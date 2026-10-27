@@ -4,16 +4,16 @@ import { pieceRank } from '../src/ui/pieceRank';
 
 describe('pieceRank', () => {
   it('maps ownership thresholds to ranks', () => {
-    expect(pieceRank(0.65, BLACK, false).rank).toBe(5);
-    expect(pieceRank(0.64, BLACK, false).rank).toBe(4);
+    expect(pieceRank(0.75, BLACK, false).rank).toBe(5);
+    expect(pieceRank(0.74, BLACK, false).rank).toBe(4);
     expect(pieceRank(0.60, BLACK, false).rank).toBe(4);
     expect(pieceRank(0.59, BLACK, false).rank).toBe(3);
-    expect(pieceRank(0.48, BLACK, false).rank).toBe(3);
-    expect(pieceRank(0.47, BLACK, false).rank).toBe(2);
-    expect(pieceRank(0.46, BLACK, false).rank).toBe(2);
-    expect(pieceRank(0.45, BLACK, false).rank).toBe(1);
-    expect(pieceRank(0.40, BLACK, false).rank).toBe(1);
-    expect(pieceRank(0.39, BLACK, false).rank).toBe(0);
+    expect(pieceRank(0.50, BLACK, false).rank).toBe(3);
+    expect(pieceRank(0.49, BLACK, false).rank).toBe(2);
+    expect(pieceRank(0.45, BLACK, false).rank).toBe(2);
+    expect(pieceRank(0.44, BLACK, false).rank).toBe(1);
+    expect(pieceRank(0.36, BLACK, false).rank).toBe(1);
+    expect(pieceRank(0.35, BLACK, false).rank).toBe(0);
   });
 
   it('uses the stone color perspective', () => {
