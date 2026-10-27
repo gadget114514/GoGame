@@ -1316,8 +1316,7 @@ export class Board3D {
       if (row + 1 < n) neighbors.push(index + n);
 
       for (const neighbor of neighbors) {
-        const other = goban.board[neighbor];
-        if (other !== BLACK && other !== WHITE) continue;
+        if (goban.board[neighbor] !== color) continue;
         const low = Math.min(index, neighbor);
         const high = Math.max(index, neighbor);
         const edgeKey = low * goban.area + high;
