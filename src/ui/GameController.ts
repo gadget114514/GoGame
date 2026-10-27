@@ -258,6 +258,7 @@ export class GameController {
     this.els.toggleEyeHighlight.checked = this.eyeHighlightEnabled;
     this.els.wallModel.value = this.wallModel;
     this.els.fenceModel.value = this.fenceModel;
+    this.updateFenceModelAvailability();
     this.els.trueEyeModel.value = this.trueEyeModel;
     this.els.toggleFalseEyeModels.checked = this.falseEyeModelsEnabled;
     this.els.replaySpeed.value = String(this.replaySpeed);
@@ -402,6 +403,7 @@ export class GameController {
       const value = this.els.wallModel.value;
       this.wallModel =
         value === 'off' || value === 'seaweed' || value === 'fence' ? value : 'fence';
+      this.updateFenceModelAvailability();
       this.persistConfig();
       this.render();
     });
@@ -534,6 +536,14 @@ export class GameController {
       ?.classList.toggle('stone', style === 'stone');
   }
 
+  private updateFenceModelAvailability(): void {
+    const enabled = this.wallModel === 'fence';
+    this.els.fenceModel.disabled = !enabled;
+    document
+      .getElementById('label-fence-model')
+      ?.classList.toggle('disabled', !enabled);
+  }
+
   private applyStylePreset(style: PieceStyle): void {
     const preset = STYLE_PRESETS[style];
     this.wallModel = preset.wallModel;
@@ -543,6 +553,7 @@ export class GameController {
     this.heatmapTheme = preset.heatmapTheme;
     this.captureEffect = preset.captureEffect;
     this.els.wallModel.value = preset.wallModel;
+    this.updateFenceModelAvailability();
     this.els.trueEyeModel.value = preset.trueEyeModel;
     this.els.toggleFalseEyeModels.checked = preset.falseEyeModels;
     this.els.boardColor.value = preset.boardColor;

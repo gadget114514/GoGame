@@ -210,6 +210,10 @@ canvas[hidden],
   min-height: 20px;
 }
 
+#label-fence-model.disabled {
+  opacity: 0.45;
+}
+
 #rank-legend.legend-text-only li {
   grid-template-columns: 1fr auto;
 }
