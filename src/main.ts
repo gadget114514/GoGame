@@ -1,6 +1,11 @@
 import './style.css';
 import { GameController } from './ui/GameController';
 import { isElectron } from './platform/env';
+import { clearGlbCacheOnce } from './platform/assetCache';
+
+if (!isElectron()) {
+  await clearGlbCacheOnce();
+}
 
 if (!isElectron() && 'serviceWorker' in navigator) {
   import('virtual:pwa-register')
