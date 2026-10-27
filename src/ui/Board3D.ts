@@ -209,6 +209,10 @@ const EYE_MODEL_HEIGHTS: Record<EyeModelKind, number> = {
   falseeye: 1.2
 };
 const FENCE_MODEL_SCALE = 0.6;
+const BOARD_EDGE_MARGIN = 0.9;
+const CAMERA_FIT_PADDING = 1.02;
+const MAX_CONTENT_HEIGHT =
+  Math.max(...Object.values(PIECE_TARGET_HEIGHTS), ...Object.values(EYE_MODEL_HEIGHTS)) + 0.03;
 
 export class Board3D {
   private engine: Engine;
@@ -277,6 +281,8 @@ export class Board3D {
   private hoverHandler: ((index: number | null) => void) | null = null;
   private size: BoardSize = 19;
   private clickHandler: ((index: number) => void) | null = null;
+  private resizeObserver: ResizeObserver | null = null;
+  private viewFitted = false;
 
   ready = false;
 
@@ -466,6 +472,10 @@ export class Board3D {
 
     this.attachPointer();
     window.addEventListener('resize', this.resize);
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => this.resize());
+      this.resizeObserver.observe(canvas);
+    }
     this.engine.runRenderLoop(() => this.scene.render());
 
     void this.setPieceStyle('quirky-animals');
@@ -473,15 +483,16 @@ export class Board3D {
 
   setCameraProjection(projection: CameraProjection): void {
     this.cameraProjection = projection;
-    if (projection === 'orthographic') {
-      this.camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
-      this.updateOrthoBounds();
-    } else {
-      this.camera.mode = Camera.PERSPECTIVE_CAMERA;
-    }
+    this.camera.mode =
+      projection === 'orthographic' ? Camera.ORTHOGRAPHIC_CAMERA : Camera.PERSPECTIVE_CAMERA;
+    this.fitCameraToBoard();
   }
 
   private updateOrthoBounds(): void {
+    if (!this.viewFitted) {
+      this.fitCameraToBoard();
+      if (!this.viewFitted) return;
+    }
     if (this.cameraProjection !== 'orthographic') return;
     const aspect =
       this.engine.getRenderWidth() / Math.max(1, this.engine.getRenderHeight());
@@ -490,6 +501,42 @@ export class Board3D {
     this.camera.orthoBottom = -halfHeight;
     this.camera.orthoRight = halfHeight * aspect;
     this.camera.orthoLeft = -halfHeight * aspect;
+  }
+
+  private fitCameraToBoard(): void {
+    const width = this.engine.getRenderWidth();
+    const height = this.engine.getRenderHeight();
+    if (width <= 0 || height <= 0) return;
+
+    const halfBoard = (this.size * SPACING + BOARD_EDGE_MARGIN) / 2;
+    const alphaExtent =
+      Math.abs(Math.sin(this.camera.alpha)) + Math.abs(Math.cos(this.camera.alpha));
+    const beta = this.camera.beta;
+    const halfWidth = halfBoard * alphaExtent;
+    const halfHeight =
+      halfWidth * Math.abs(Math.cos(beta)) +
+      MAX_CONTENT_HEIGHT * Math.abs(Math.sin(beta));
+    const aspect = width / height;
+    const needed =
+      Math.max(halfHeight, halfWidth / Math.max(aspect, 0.0001)) * CAMERA_FIT_PADDING;
+    const tanHalfFov = Math.tan(this.camera.fov / 2);
+    const nearEdge = halfBoard * alphaExtent * Math.abs(Math.sin(beta));
+    const distance =
+      this.cameraProjection === 'perspective'
+        ? needed / tanHalfFov + nearEdge
+        : needed / tanHalfFov;
+
+    this.viewFitted = true;
+    this.camera.radius = distance;
+    this.camera.lowerRadiusLimit = Math.min(
+      this.camera.lowerRadiusLimit ?? distance,
+      distance
+    );
+    this.camera.upperRadiusLimit = Math.max(
+      this.camera.upperRadiusLimit ?? distance,
+      distance
+    );
+    this.updateOrthoBounds();
   }
 
   setPerspective(side: 'black' | 'white'): void {
@@ -778,7 +825,11 @@ export class Board3D {
 
     const board = MeshBuilder.CreateBox(
       'board',
-      { width: planeWidth + 0.9, depth: planeWidth + 0.9, height: 0.4 },
+      {
+        width: planeWidth + BOARD_EDGE_MARGIN,
+        depth: planeWidth + BOARD_EDGE_MARGIN,
+        height: 0.4
+      },
       this.scene
     );
     board.position.y = -0.2;
@@ -886,10 +937,10 @@ export class Board3D {
 
     this.drawCoordinates(null);
 
-    this.camera.radius = Math.max(14, n * 1.75);
-    this.camera.lowerRadiusLimit = Math.max(8, n * 0.75);
+    this.camera.lowerRadiusLimit = Math.max(2, n * 0.25);
     this.camera.upperRadiusLimit = Math.max(24, n * 4);
     this.camera.setTarget(Vector3.Zero());
+    this.fitCameraToBoard();
   }
 
   update(state: RenderState): void {
@@ -1123,7 +1174,7 @@ export class Board3D {
       state.wallModel === 'seaweed';
     const fences =
       state.wallModel === 'fence' && state.fenceModel !== 'none'
-        ? this.connectedLibertyFences(state.goban)
+        ? this.adjacentStoneFences(state.goban)
         : [];
 
     if (!needsEyeDecor && fences.length === 0) {
@@ -1248,49 +1299,44 @@ export class Board3D {
     this.eyeDecorKey = key;
   }
 
-  private connectedLibertyFences(
+  private adjacentStoneFences(
     goban: Goban
   ): Array<{ x: number; z: number; angle: number }> {
     const n = goban.size;
     const placements: Array<{ x: number; z: number; angle: number }> = [];
-    const seenGroups = new Uint8Array(goban.area);
     const seenEdges = new Set<number>();
 
     for (let index = 0; index < goban.area; index++) {
       const color = goban.board[index];
-      if ((color !== BLACK && color !== WHITE) || seenGroups[index]) continue;
-      const group = goban.groupAt(index);
-      for (const stone of group.stones) seenGroups[stone] = 1;
+      if (color !== BLACK && color !== WHITE) continue;
+      const row = Math.floor(index / n);
+      const col = index % n;
+      const neighbors: number[] = [];
+      if (col + 1 < n) neighbors.push(index + 1);
+      if (row + 1 < n) neighbors.push(index + n);
 
-      for (const liberty of group.liberties) {
-        const row = Math.floor(liberty / n);
-        const col = liberty % n;
-        const neighbors: number[] = [];
-        if (col + 1 < n) neighbors.push(liberty + 1);
-        if (row + 1 < n) neighbors.push(liberty + n);
+      for (const neighbor of neighbors) {
+        const other = goban.board[neighbor];
+        if (other !== BLACK && other !== WHITE) continue;
+        const low = Math.min(index, neighbor);
+        const high = Math.max(index, neighbor);
+        const edgeKey = low * goban.area + high;
+        if (seenEdges.has(edgeKey)) continue;
+        seenEdges.add(edgeKey);
 
-        for (const neighbor of neighbors) {
-          if (!group.liberties.has(neighbor)) continue;
-          const low = Math.min(liberty, neighbor);
-          const high = Math.max(liberty, neighbor);
-          const edgeKey = low * goban.area + high;
-          if (seenEdges.has(edgeKey)) continue;
-          seenEdges.add(edgeKey);
-
-          const neighborRow = Math.floor(neighbor / n);
-          const neighborCol = neighbor % n;
-          const ax = this.worldCoordinateX(col);
-          const az = this.worldCoordinateZ(row);
-          const bx = this.worldCoordinateX(neighborCol);
-          const bz = this.worldCoordinateZ(neighborRow);
-          const dx = bx - ax;
-          const dz = bz - az;
-          placements.push({
-            x: (ax + bx) / 2,
-            z: (az + bz) / 2,
-            angle: Math.atan2(-dz, dx)
-          });
-        }
+        const neighborRow = Math.floor(neighbor / n);
+        const neighborCol = neighbor % n;
+        const ax = this.worldCoordinateX(col);
+        const az = this.worldCoordinateZ(row);
+        const bx = this.worldCoordinateX(neighborCol);
+        const bz = this.worldCoordinateZ(neighborRow);
+        const dx = bx - ax;
+        const dz = bz - az;
+        placements.push({
+          x: (ax + bx) / 2,
+          z: (az + bz) / 2,
+          angle: Math.atan2(-dz, dx)
+        });
       }
     }
 
@@ -2352,11 +2398,13 @@ export class Board3D {
 
   resize = (): void => {
     this.engine.resize();
-    this.updateOrthoBounds();
+    this.fitCameraToBoard();
   };
 
   dispose(): void {
     window.removeEventListener('resize', this.resize);
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
     this.pendingPlacements.forEach((pending) => pending.cancel());
     this.pendingPlacements.clear();
     this.scene.dispose();
