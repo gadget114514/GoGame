@@ -8,6 +8,7 @@ export interface Translations {
   boardColor: string;
   boardWood: string;
   boardGreen: string;
+  boardDarkGreen: string;
   boardGray: string;
   ai: string;
   opponent: string;
@@ -131,6 +132,7 @@ const DICTIONARIES: Record<Language, Translations> = {
     boardColor: 'Board Color',
     boardWood: 'Wood',
     boardGreen: 'Green',
+    boardDarkGreen: 'Dark Green',
     boardGray: 'Gray',
     ai: 'AI',
     opponent: 'Opponent',
@@ -252,6 +254,7 @@ const DICTIONARIES: Record<Language, Translations> = {
     boardColor: '盤面の色',
     boardWood: '木目',
     boardGreen: '緑',
+    boardDarkGreen: '濃い緑',
     boardGray: 'グレー',
     ai: 'AI',
     opponent: '相手',
@@ -373,6 +376,7 @@ const DICTIONARIES: Record<Language, Translations> = {
     boardColor: 'Color del tablero',
     boardWood: 'Madera',
     boardGreen: 'Verde',
+    boardDarkGreen: 'Verde oscuro',
     boardGray: 'Gris',
     ai: 'IA',
     opponent: 'Oponente',

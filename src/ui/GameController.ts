@@ -24,6 +24,7 @@ import {
 import { generateSGF, parseSGF } from '../game/sgf';
 import { EvalGraph, type EvalPoint } from './EvalGraph';
 import { rankLegendRanges } from './pieceRank';
+import { PIECE_STYLE_LEGEND_NAMES, type LegendRank } from './pieceLabels';
 import { isHeatmapTheme, type HeatmapTheme } from './heatmap';
 import { isBoardColor, type BoardColor } from './boardTheme';
 import { isFenceModel, type FenceModel } from './fenceModels';
@@ -518,6 +519,7 @@ export class GameController {
     });
     this.els.btnPlay.title = this.isPlayingReplay ? t('pause') : t('play');
     this.evalGraph.updateLanguage();
+    this.applyLegendLabels();
     this.updateViewButtonText();
     this.updateStatus();
   }
@@ -621,6 +623,18 @@ export class GameController {
     legend.classList.toggle('legend-text-only', !isChess);
     legend.style.display =
       this.view === '3d' && this.pieceStyle !== 'stones' ? '' : 'none';
+    this.applyLegendLabels();
+  }
+
+  private applyLegendLabels(): void {
+    const names = PIECE_STYLE_LEGEND_NAMES[this.pieceStyle];
+    const ranks: LegendRank[] = ['king', 'queen', 'rook', 'bishop', 'knight', 'pawn'];
+    for (const rank of ranks) {
+      const element = document.querySelector<HTMLElement>(
+        `#rank-legend .name[data-i18n="${rank}"]`
+      );
+      if (element) element.textContent = names?.[rank] ?? t(rank);
+    }
   }
 
   private updateViewButtonText(): void {

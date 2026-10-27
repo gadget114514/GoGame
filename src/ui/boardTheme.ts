@@ -1,6 +1,6 @@
-export type BoardColor = 'wood' | 'green' | 'gray';
+export type BoardColor = 'wood' | 'green' | 'dark-green' | 'gray';
 
-export const BOARD_COLORS: readonly BoardColor[] = ['wood', 'green', 'gray'];
+export const BOARD_COLORS: readonly BoardColor[] = ['wood', 'green', 'dark-green', 'gray'];
 
 export interface BoardPalette {
   surface: string;
@@ -26,6 +26,14 @@ const BOARD_PALETTES: Record<BoardColor, BoardPalette> = {
     grid: '#1d3a24',
     star: '#17301d',
     coord: '#142711',
+    coordActive: '#ffd166'
+  },
+  'dark-green': {
+    surface: '#2f5d3a',
+    rim: '#1d3d26',
+    grid: '#9fbf9f',
+    star: '#7ea882',
+    coord: '#e7f0e4',
     coordActive: '#ffd166'
   },
   gray: {
