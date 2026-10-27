@@ -4,6 +4,7 @@ import { isHeatmapTheme, type HeatmapTheme } from './ui/heatmap';
 import { isBoardColor, type BoardColor } from './ui/boardTheme';
 import { isFenceModel, type FenceModel } from './ui/fenceModels';
 import type {
+  CameraProjection,
   CaptureEffect,
   DeadStoneStyle,
   PieceStyle,
@@ -34,6 +35,7 @@ export interface GameConfig {
   animations: boolean;
   evalGraph: boolean;
   twoEyeHighlight: boolean;
+  cameraProjection: CameraProjection;
   wallModel: WallModel;
   fenceModel: FenceModel;
   trueEyeModel: TrueEyeModel;
@@ -62,6 +64,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   animations: true,
   evalGraph: true,
   twoEyeHighlight: true,
+  cameraProjection: 'orthographic',
   wallModel: 'fence',
   fenceModel: 'dark',
   trueEyeModel: 'trueeye',
@@ -84,6 +87,7 @@ const TRUE_EYE_MODELS = new Set<TrueEyeModel>(['off', 'cute', 'trueeye']);
 const LANGUAGES = new Set<Language>(['en', 'ja', 'es']);
 const OPPONENTS = new Set<OpponentMode>(['dan', 'kyu', 'manual']);
 const RULES = new Set<Rules>(['chinese']);
+const CAMERA_PROJECTIONS = new Set<CameraProjection>(['perspective', 'orthographic']);
 const SIDES = new Set<'black' | 'white'>(['black', 'white']);
 const VIEWS = new Set<ViewMode>(['3d', '2d']);
 const REPLAY_SPEEDS = new Set([500, 1000, 1500]);
@@ -140,6 +144,9 @@ function sanitize(raw: unknown): GameConfig {
   if (WALL_MODELS.has(value.wallModel as WallModel)) {
     config.wallModel = value.wallModel as WallModel;
   }
+  if (CAMERA_PROJECTIONS.has(value.cameraProjection as CameraProjection)) {
+    config.cameraProjection = value.cameraProjection as CameraProjection;
+  }
   if (isFenceModel(value.fenceModel)) {
     config.fenceModel = value.fenceModel;
   }
@@ -193,6 +200,12 @@ function readLegacy(): Partial<GameConfig> {
 
   const wallModel = storage.getItem('gogame:wallModel') as WallModel | null;
   if (wallModel && WALL_MODELS.has(wallModel)) legacy.wallModel = wallModel;
+  const cameraProjection = storage.getItem(
+    'gogame:cameraProjection'
+  ) as CameraProjection | null;
+  if (cameraProjection && CAMERA_PROJECTIONS.has(cameraProjection)) {
+    legacy.cameraProjection = cameraProjection;
+  }
   const fenceModel = storage.getItem('gogame:fenceModel');
   if (isFenceModel(fenceModel)) legacy.fenceModel = fenceModel;
   const trueEyeModel = storage.getItem('gogame:trueEyeModel') as TrueEyeModel | null;

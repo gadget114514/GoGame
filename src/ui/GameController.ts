@@ -4,6 +4,7 @@ import { KataGoEngine, type Evaluation } from '../ai/KataGoEngine';
 import type { AILevel } from '../ai/registry';
 import {
   Board3D,
+  type CameraProjection,
   type CaptureEffect,
   type DeadStoneStyle,
   type PieceStyle,
@@ -36,6 +37,7 @@ interface Elements {
   canvas2d: HTMLCanvasElement;
   boardSize: HTMLSelectElement;
   rules: HTMLSelectElement;
+  cameraProjection: HTMLSelectElement;
   aiLevel: HTMLSelectElement;
   playerSide: HTMLSelectElement;
   pieceStyle: HTMLSelectElement;
@@ -118,6 +120,7 @@ export class GameController {
   private goban: Goban;
   private opponent: OpponentMode = 'dan';
   private rules: Rules = 'chinese';
+  private cameraProjection: CameraProjection = 'orthographic';
   private playerSide: 'black' | 'white' = 'black';
   private pieceStyle: PieceStyle = 'quirky-animals';
   private deadStoneStyle: DeadStoneStyle = 'cube';
@@ -167,6 +170,7 @@ export class GameController {
       canvas2d: requireElement('scene2d'),
       boardSize: requireElement('board-size'),
       rules: requireElement('rules'),
+      cameraProjection: requireElement('camera-projection'),
       aiLevel: requireElement('ai-level'),
       playerSide: requireElement('player-side'),
       pieceStyle: requireElement('piece-style'),
@@ -222,6 +226,7 @@ export class GameController {
     this.config = loadConfig();
     this.opponent = this.config.opponent;
     this.rules = this.config.rules;
+    this.cameraProjection = this.config.cameraProjection;
     this.playerSide = this.config.playerSide;
     this.pieceStyle = this.config.pieceStyle;
     this.deadStoneStyle = this.config.deadStoneStyle;
@@ -242,6 +247,7 @@ export class GameController {
 
     this.els.boardSize.value = String(this.config.boardSize);
     this.els.rules.value = this.rules;
+    this.els.cameraProjection.value = this.cameraProjection;
     this.els.komi.value = String(this.config.komi);
     this.els.aiLevel.value = this.opponent;
     this.els.playerSide.value = this.playerSide;
@@ -282,6 +288,7 @@ export class GameController {
     this.evalGraph.onVisibilityChange((visible) => this.setEvalGraphEnabled(visible));
     this.setEvalGraphEnabled(this.evalGraphEnabled);
 
+    this.board3d.setCameraProjection(this.cameraProjection);
     this.board3d.setBoardSize(size);
     this.updateRankLegend();
     this.board3d.setPerspective(this.playerSide);
@@ -331,6 +338,13 @@ export class GameController {
     this.els.view.addEventListener('click', () => this.toggleView());
 
     this.els.boardSize.addEventListener('change', () => this.changeBoardSize());
+    this.els.cameraProjection.addEventListener('change', () => {
+      const value = this.els.cameraProjection.value;
+      this.cameraProjection =
+        value === 'perspective' ? 'perspective' : 'orthographic';
+      this.board3d.setCameraProjection(this.cameraProjection);
+      this.persistConfig();
+    });
     this.els.rules.addEventListener('change', () => {
       this.rules = this.els.rules.value === 'chinese' ? 'chinese' : 'chinese';
       this.persistConfig();
@@ -580,6 +594,7 @@ export class GameController {
       version: 1,
       boardSize: this.goban.size,
       rules: this.rules,
+      cameraProjection: this.cameraProjection,
       komi: this.goban.komi,
       opponent: this.opponent,
       playerSide: this.playerSide,

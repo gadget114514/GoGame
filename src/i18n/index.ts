@@ -5,6 +5,9 @@ export interface Translations {
   rules: string;
   rulesChinese: string;
   rulesTitle: string;
+  cameraProjection: string;
+  cameraPerspective: string;
+  cameraOrthographic: string;
   boardColor: string;
   boardWood: string;
   boardGreen: string;
@@ -130,6 +133,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     rules: 'Rules',
     rulesChinese: 'Chinese',
     rulesTitle: 'Chinese rules: area scoring counts stones and surrounded territory.',
+    cameraProjection: 'Camera',
+    cameraPerspective: 'Perspective',
+    cameraOrthographic: 'Orthographic',
     boardColor: 'Board Color',
     boardWood: 'Wood',
     boardGreen: 'Green',
@@ -253,6 +259,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     rules: 'ルール',
     rulesChinese: '中国ルール',
     rulesTitle: '中国ルール：石と囲んだ地の合計（面積）で計算します。',
+    cameraProjection: 'カメラ',
+    cameraPerspective: 'パースペクティブ',
+    cameraOrthographic: 'オルソグラフィック',
     boardColor: '盤面の色',
     boardWood: '木目',
     boardGreen: '緑',
@@ -376,6 +385,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     rules: 'Reglas',
     rulesChinese: 'Chino',
     rulesTitle: 'Reglas chinas: puntuación por área (piedras y territorio rodeado).',
+    cameraProjection: 'Cámara',
+    cameraPerspective: 'Perspectiva',
+    cameraOrthographic: 'Ortográfica',
     boardColor: 'Color del tablero',
     boardWood: 'Madera',
     boardGreen: 'Verde',

@@ -34,6 +34,7 @@ describe('game config', () => {
 
     expect(config.boardSize).toBe(9);
     expect(config.rules).toBe('chinese');
+    expect(config.cameraProjection).toBe('orthographic');
     expect(config.komi).toBe(7);
     expect(config.pieceStyle).toBe('quirky-animals');
     expect(config.heatmapTheme).toBe('green-orange');
@@ -55,6 +56,7 @@ describe('game config', () => {
       ...DEFAULT_CONFIG,
       boardSize: 13,
       rules: 'chinese',
+      cameraProjection: 'perspective',
       komi: 7.5,
       pieceStyle: 'animal-bag',
       boardColor: 'green',
@@ -72,6 +74,7 @@ describe('game config', () => {
     expect(config.pieceStyle).toBe('animal-bag');
     expect(config.boardColor).toBe('green');
     expect(config.captureEffect).toBe('dissolve');
+    expect(config.cameraProjection).toBe('perspective');
     expect(config.fenceModel).toBe('light');
     expect(config.wallModel).toBe('seaweed');
     expect(config.trueEyeModel).toBe('cute');

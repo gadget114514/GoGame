@@ -1,5 +1,6 @@
 import {
   ArcRotateCamera,
+  Camera,
   Color3,
   Color4,
   DirectionalLight,
@@ -43,6 +44,7 @@ export type PieceStyle =
   | 'quirky-animals'
   | 'stones';
 export type DeadStoneStyle = 'cube' | 'stone';
+export type CameraProjection = 'perspective' | 'orthographic';
 export type CaptureEffect = 'shatter' | 'dissolve' | 'height';
 
 export interface RenderState {
@@ -203,6 +205,7 @@ export class Board3D {
   private engine: Engine;
   private scene: Scene;
   private camera: ArcRotateCamera;
+  private cameraProjection: CameraProjection = 'orthographic';
 
   private woodMaterial: StandardMaterial;
   private starMaterial: StandardMaterial;
@@ -275,13 +278,14 @@ export class Board3D {
 
     this.camera = new ArcRotateCamera(
       'camera',
-      -Math.PI / 2,
+      -Math.PI / 4,
       0.82,
       26,
       Vector3.Zero(),
       this.scene
     );
     this.camera.attachControl(canvas, true);
+    this.camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
     this.camera.panningSensibility = 250;
     (this.camera as unknown as { _panningMouseButton: number })._panningMouseButton = 0;
     this.camera.lowerRadiusLimit = 9;
@@ -446,6 +450,8 @@ export class Board3D {
     hoverRing.isVisible = false;
     this.hoverMarker = hoverRing;
 
+    this.updateOrthoBounds();
+    this.scene.onBeforeRenderObservable.add(() => this.updateOrthoBounds());
     this.scene.onBeforeRenderObservable.add(() => this.animateLastMoveMarker());
     this.scene.onBeforeRenderObservable.add(() => this.animateAlertPieces());
 
@@ -456,10 +462,31 @@ export class Board3D {
     void this.setPieceStyle('quirky-animals');
   }
 
+  setCameraProjection(projection: CameraProjection): void {
+    this.cameraProjection = projection;
+    if (projection === 'orthographic') {
+      this.camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
+      this.updateOrthoBounds();
+    } else {
+      this.camera.mode = Camera.PERSPECTIVE_CAMERA;
+    }
+  }
+
+  private updateOrthoBounds(): void {
+    if (this.cameraProjection !== 'orthographic') return;
+    const aspect =
+      this.engine.getRenderWidth() / Math.max(1, this.engine.getRenderHeight());
+    const halfHeight = this.camera.radius * Math.tan(this.camera.fov / 2);
+    this.camera.orthoTop = halfHeight;
+    this.camera.orthoBottom = -halfHeight;
+    this.camera.orthoRight = halfHeight * aspect;
+    this.camera.orthoLeft = -halfHeight * aspect;
+  }
+
   setPerspective(side: 'black' | 'white'): void {
     if (this.perspective === side) return;
     this.perspective = side;
-    const targetAlpha = side === 'white' ? Math.PI / 2 : -Math.PI / 2;
+    const targetAlpha = side === 'white' ? (Math.PI * 3) / 4 : -Math.PI / 4;
     this.camera.alpha = targetAlpha;
 
     if (this.coordPlane) {
@@ -2316,6 +2343,7 @@ export class Board3D {
 
   resize = (): void => {
     this.engine.resize();
+    this.updateOrthoBounds();
   };
 
   dispose(): void {
