@@ -63,7 +63,7 @@ const QUIRKY = {
     knight: 'Pudu',
     bishop: 'Colobus',
     rook: 'Muskrat',
-    queen: 'Gecko',
+    queen: 'Taipan',
     king: 'Inkfish'
   }
 };
