@@ -596,23 +596,34 @@ canvas[hidden],
   text-transform: none;
 }
 
-.rank-threshold-grid {
+.rank-threshold-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px 16px;
+  gap: 6px;
 }
 
-.rank-threshold-grid label {
-  display: flex;
+.rank-threshold-list label {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
+  justify-content: normal;
   gap: 8px;
   min-width: 0;
   color: var(--muted);
   font-size: 12px;
 }
 
-.rank-threshold-grid input[type="number"] {
+.rank-threshold-icon {
+  color: var(--accent);
+  font-size: 16px;
+  line-height: 1;
+  text-align: center;
+}
+
+.rank-threshold-name {
+  min-width: 0;
+}
+
+.rank-threshold-row input[type="number"] {
   width: 58px;
   padding: 3px 6px;
   text-align: right;
@@ -659,9 +670,6 @@ canvas[hidden],
   .settings-body {
     grid-template-columns: 1fr;
     padding: 14px 14px 18px;
-  }
-  .rank-threshold-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
