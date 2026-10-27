@@ -5,7 +5,7 @@ desktop app. Stones are chess pieces whose rank grows from pawn to king based
 on the KataGo ownership/weight estimate, and the board surface is tinted by the
 predicted territory.
 
-![GoGame 3D](doc/screenshot.png)
+![GoGame 3D](doc/screenshot.jpg)
 
 **Play online:** https://gadget114514.github.io/GoGame/
 
