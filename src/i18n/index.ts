@@ -105,6 +105,7 @@ export interface Translations {
   lastMove: string;
   passMove: string;
   gameOver: string;
+  gameOverTitle: string;
   byMargin: string;
   even: string;
   preview: string;
@@ -242,6 +243,7 @@ const DICTIONARIES: Record<Language, Translations> = {
     lastMove: 'Last: {color} {coord}',
     passMove: 'Pass',
     gameOver: 'Game over — {winner}{margin}',
+    gameOverTitle: 'Game Over',
     byMargin: ' by {margin}',
     even: 'Even',
     preview: 'Preview',
@@ -374,6 +376,7 @@ const DICTIONARIES: Record<Language, Translations> = {
     lastMove: '直前: {color} {coord}',
     passMove: 'パス',
     gameOver: '終局 — {winner}{margin}',
+    gameOverTitle: '終局',
     byMargin: ' {margin}目勝ち',
     even: '互角',
     preview: '予測',
@@ -506,6 +509,7 @@ const DICTIONARIES: Record<Language, Translations> = {
     lastMove: 'Última: {color} {coord}',
     passMove: 'Pase',
     gameOver: 'Fin de partida — {winner}{margin}',
+    gameOverTitle: 'Fin de la partida',
     byMargin: ' por {margin}',
     even: 'Igualado',
     preview: 'Prevista',

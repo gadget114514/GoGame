@@ -79,6 +79,10 @@ interface Elements {
   creditsModal: HTMLElement;
   creditsContent: HTMLElement;
   creditsClose: HTMLButtonElement;
+  gameOverModal: HTMLElement;
+  gameOverResult: HTMLElement;
+  gameOverScore: HTMLElement;
+  gameOverClose: HTMLButtonElement;
   thinking: HTMLElement;
   boot: HTMLElement;
   turn: HTMLElement;
@@ -227,6 +231,10 @@ export class GameController {
       creditsModal: requireElement('credits-modal'),
       creditsContent: requireElement('credits-content'),
       creditsClose: requireElement('btn-close-credits'),
+      gameOverModal: requireElement('game-over-modal'),
+      gameOverResult: requireElement('game-over-result'),
+      gameOverScore: requireElement('game-over-score'),
+      gameOverClose: requireElement('btn-close-game-over'),
       thinking: requireElement('thinking'),
       boot: requireElement('boot'),
       turn: requireElement('turn'),
@@ -504,6 +512,12 @@ export class GameController {
     this.els.creditsModal.addEventListener('click', (event) => {
       if (event.target === this.els.creditsModal) this.closeCredits();
     });
+    this.els.gameOverClose.addEventListener('click', () =>
+      this.closeGameOverDialog()
+    );
+    this.els.gameOverModal.addEventListener('click', (event) => {
+      if (event.target === this.els.gameOverModal) this.closeGameOverDialog();
+    });
 
     this.els.btnFirst.addEventListener('click', () => this.firstMove());
     this.els.btnPrev.addEventListener('click', () => this.prevMove());
@@ -523,6 +537,11 @@ export class GameController {
     window.addEventListener('keydown', (e) => {
       const activeTag = (document.activeElement?.tagName || '').toLowerCase();
       if (e.key === 'Escape') {
+        if (!this.els.gameOverModal.hidden) {
+          e.preventDefault();
+          this.closeGameOverDialog();
+          return;
+        }
         if (!this.els.settingsModal.hidden) {
           e.preventDefault();
           this.closeSettings();
@@ -677,6 +696,28 @@ export class GameController {
   private closeCredits(): void {
     this.els.creditsModal.hidden = true;
     this.els.credits.focus();
+  }
+
+  private showGameOverDialog(): void {
+    const result = this.goban.score();
+    const winner =
+      result.winner === BLACK ? t('black') : result.winner === WHITE ? t('white') : t('draw');
+    const margin =
+      result.winner === 0 ? '' : t('byMargin', { margin: result.margin.toFixed(1) });
+    this.els.gameOverResult.textContent =
+      result.winner === 0 ? t('draw') : `${winner}${margin}`;
+    this.els.gameOverScore.textContent = `B ${result.black.toFixed(1)} : ${result.white.toFixed(1)} W (${t('komi')} ${result.komi})`;
+    this.els.gameOverModal.hidden = false;
+    this.els.gameOverClose.focus();
+  }
+
+  private closeGameOverDialog(): void {
+    this.hideGameOverDialog();
+    this.els.newGame.focus();
+  }
+
+  private hideGameOverDialog(): void {
+    this.els.gameOverModal.hidden = true;
   }
 
   private applyLegendStyle(): void {
@@ -892,6 +933,7 @@ export class GameController {
   private resetHistory(): void {
     this.stopReplay();
     this.cancelBackgroundEvaluation();
+    this.hideGameOverDialog();
     this.history = [
       {
         board: new Uint8Array(this.goban.board),
@@ -930,6 +972,7 @@ export class GameController {
   }
 
   private restoreSnapshot(snapshot: HistorySnapshot): void {
+    this.hideGameOverDialog();
     this.goban.board = new Uint8Array(snapshot.board);
     this.goban.side = snapshot.side;
     this.goban.ko = snapshot.ko;
@@ -1434,8 +1477,10 @@ export class GameController {
 
   private checkGameOver(): void {
     if (this.goban.consecutivePasses >= 2) {
+      const wasOver = this.gameOver;
       this.gameOver = true;
       this.updateStatus();
+      if (!wasOver) this.showGameOverDialog();
     }
   }
 

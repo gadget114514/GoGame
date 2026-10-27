@@ -255,6 +255,19 @@
         </div>
       </div>
 
+      <div id="game-over-modal" class="overlay game-over-modal" hidden>
+        <div class="game-over-panel" role="dialog" aria-modal="true" aria-labelledby="game-over-title" aria-describedby="game-over-result game-over-score">
+          <div class="game-over-header">
+            <h2 id="game-over-title" data-i18n="gameOverTitle">Game Over</h2>
+            <button id="btn-close-game-over" class="credits-close" title="Close" aria-label="Close">&times;</button>
+          </div>
+          <div class="game-over-body">
+            <p id="game-over-result" class="game-over-result"></p>
+            <p id="game-over-score" class="game-over-score"></p>
+          </div>
+        </div>
+      </div>
+
       <footer id="status">
         <span id="turn">Black to play</span>
         <span id="score"></span>

@@ -738,6 +738,60 @@ canvas[hidden],
   user-select: text;
 }
 
+.game-over-modal {
+  padding: 18px;
+}
+
+.game-over-panel {
+  width: min(400px, 92vw);
+  background: linear-gradient(180deg, #241a13, #17110d);
+  border: 1px solid #5a4130;
+  border-radius: 10px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.62);
+  overflow: hidden;
+}
+
+.game-over-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 16px;
+  background: rgba(14, 10, 7, 0.6);
+  border-bottom: 1px solid #4a3424;
+}
+
+.game-over-header h2 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.game-over-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 22px 20px 26px;
+  text-align: center;
+}
+
+.game-over-result {
+  margin: 0;
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.game-over-score {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 @media (max-width: 640px) {
   #toolbar {
     padding: 8px;
