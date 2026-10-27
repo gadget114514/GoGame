@@ -1,7 +1,9 @@
 import { DEFAULT_KOMI, isBoardSize, type BoardSize } from './game/BoardSize';
 import { detectInitialLanguage, type Language } from './i18n';
 import { isHeatmapTheme, type HeatmapTheme } from './ui/heatmap';
+import { isBoardColor, type BoardColor } from './ui/boardTheme';
 import type {
+  CaptureEffect,
   DeadStoneStyle,
   PieceStyle,
   TrueEyeModel,
@@ -19,6 +21,8 @@ export interface GameConfig {
   playerSide: 'black' | 'white';
   pieceStyle: PieceStyle;
   deadStoneStyle: DeadStoneStyle;
+  captureEffect: CaptureEffect;
+  boardColor: BoardColor;
   language: Language;
   view: ViewMode;
   hoverEval: boolean;
@@ -43,6 +47,8 @@ export const DEFAULT_CONFIG: GameConfig = {
   playerSide: 'black',
   pieceStyle: 'quirky-animals',
   deadStoneStyle: 'cube',
+  captureEffect: 'shatter',
+  boardColor: 'wood',
   language: 'en',
   view: '3d',
   hoverEval: true,
@@ -66,6 +72,7 @@ const PIECE_STYLES = new Set<PieceStyle>([
   'stones'
 ]);
 const DEAD_STONE_STYLES = new Set<DeadStoneStyle>(['cube', 'stone']);
+const CAPTURE_EFFECTS = new Set<CaptureEffect>(['shatter', 'dissolve', 'height']);
 const WALL_MODELS = new Set<WallModel>(['off', 'seaweed', 'fence']);
 const TRUE_EYE_MODELS = new Set<TrueEyeModel>(['off', 'cute', 'trueeye']);
 const LANGUAGES = new Set<Language>(['en', 'ja', 'es']);
@@ -112,6 +119,12 @@ function sanitize(raw: unknown): GameConfig {
   if (DEAD_STONE_STYLES.has(value.deadStoneStyle as DeadStoneStyle)) {
     config.deadStoneStyle = value.deadStoneStyle as DeadStoneStyle;
   }
+  if (CAPTURE_EFFECTS.has(value.captureEffect as CaptureEffect)) {
+    config.captureEffect = value.captureEffect as CaptureEffect;
+  }
+  if (isBoardColor(value.boardColor)) {
+    config.boardColor = value.boardColor;
+  }
   if (LANGUAGES.has(value.language as Language)) {
     config.language = value.language as Language;
   }
@@ -156,6 +169,10 @@ function readLegacy(): Partial<GameConfig> {
   if (pieceStyle && PIECE_STYLES.has(pieceStyle)) legacy.pieceStyle = pieceStyle;
   const deadStyle = storage.getItem('gogame:deadStoneStyle') as DeadStoneStyle | null;
   if (deadStyle && DEAD_STONE_STYLES.has(deadStyle)) legacy.deadStoneStyle = deadStyle;
+  const captureEffect = storage.getItem('gogame:captureEffect') as CaptureEffect | null;
+  if (captureEffect && CAPTURE_EFFECTS.has(captureEffect)) legacy.captureEffect = captureEffect;
+  const boardColor = storage.getItem('gogame:boardColor');
+  if (isBoardColor(boardColor)) legacy.boardColor = boardColor;
   const language = storage.getItem('gogame:language') as Language | null;
   if (language && LANGUAGES.has(language)) legacy.language = language;
   const view = storage.getItem('gogame:view') as ViewMode | null;

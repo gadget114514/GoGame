@@ -2,6 +2,10 @@ export type Language = 'en' | 'ja' | 'es';
 
 export interface Translations {
   board: string;
+  boardColor: string;
+  boardWood: string;
+  boardGreen: string;
+  boardGray: string;
   ai: string;
   opponent: string;
   dan: string;
@@ -17,6 +21,10 @@ export interface Translations {
   deadStones: string;
   deadCube: string;
   deadStone: string;
+  captureEffect: string;
+  captureShatter: string;
+  captureDissolve: string;
+  captureHeight: string;
   komi: string;
   language: string;
   hoverEval: string;
@@ -28,6 +36,8 @@ export interface Translations {
   heatOrangeGreen: string;
   heatBlueOrange: string;
   heatOrangeBlue: string;
+  heatGrayRed: string;
+  heatRedGray: string;
   animations: string;
   twoEyes: string;
   wallModel: string;
@@ -109,6 +119,10 @@ export interface Translations {
 const DICTIONARIES: Record<Language, Translations> = {
   en: {
     board: 'Board',
+    boardColor: 'Board Color',
+    boardWood: 'Wood',
+    boardGreen: 'Green',
+    boardGray: 'Gray',
     ai: 'AI',
     opponent: 'Opponent',
     dan: 'KataGo (Dan)',
@@ -124,6 +138,10 @@ const DICTIONARIES: Record<Language, Translations> = {
     deadStones: 'Dead Stones',
     deadCube: 'Cube',
     deadStone: 'Go Stone',
+    captureEffect: 'Capture Effect',
+    captureShatter: 'Shatter',
+    captureDissolve: 'Dissolve',
+    captureHeight: 'Shrink Height',
     playerSide: 'Player Side',
     sideBlack: 'Black (First)',
     sideWhite: 'White (Second)',
@@ -138,6 +156,8 @@ const DICTIONARIES: Record<Language, Translations> = {
     heatOrangeGreen: 'Orange / Green',
     heatBlueOrange: 'Blue / Orange',
     heatOrangeBlue: 'Orange / Blue',
+    heatGrayRed: 'Gray / Red',
+    heatRedGray: 'Red / Gray',
     animations: 'Animations',
     twoEyes: 'Two Eyes',
     wallModel: 'Wall',
@@ -214,6 +234,10 @@ const DICTIONARIES: Record<Language, Translations> = {
   },
   ja: {
     board: '盤面',
+    boardColor: '盤面の色',
+    boardWood: '木目',
+    boardGreen: '緑',
+    boardGray: 'グレー',
     ai: 'AI',
     opponent: '相手',
     dan: 'KataGo (有段)',
@@ -229,6 +253,10 @@ const DICTIONARIES: Record<Language, Translations> = {
     deadStones: '死石',
     deadCube: 'キューブ',
     deadStone: '碁石',
+    captureEffect: '捕獲時の演出',
+    captureShatter: '四散',
+    captureDissolve: 'ディゾルブ',
+    captureHeight: '高さで消去',
     playerSide: '手番',
     sideBlack: '黒番 (先手)',
     sideWhite: '白番 (後手)',
@@ -243,6 +271,8 @@ const DICTIONARIES: Record<Language, Translations> = {
     heatOrangeGreen: 'オレンジ / 緑',
     heatBlueOrange: '青 / オレンジ',
     heatOrangeBlue: 'オレンジ / 青',
+    heatGrayRed: 'グレー / 赤',
+    heatRedGray: '赤 / グレー',
     animations: 'アニメーション',
     twoEyes: '二眼',
     wallModel: '壁',
@@ -319,6 +349,10 @@ const DICTIONARIES: Record<Language, Translations> = {
   },
   es: {
     board: 'Tablero',
+    boardColor: 'Color del tablero',
+    boardWood: 'Madera',
+    boardGreen: 'Verde',
+    boardGray: 'Gris',
     ai: 'IA',
     opponent: 'Oponente',
     dan: 'KataGo (Dan)',
@@ -334,6 +368,10 @@ const DICTIONARIES: Record<Language, Translations> = {
     deadStones: 'Piedras muertas',
     deadCube: 'Cubo',
     deadStone: 'Piedra',
+    captureEffect: 'Efecto de captura',
+    captureShatter: 'Fragmentar',
+    captureDissolve: 'Disolver',
+    captureHeight: 'Altura',
     playerSide: 'Bando',
     sideBlack: 'Negras (Primera)',
     sideWhite: 'Blancas (Segunda)',
@@ -348,6 +386,8 @@ const DICTIONARIES: Record<Language, Translations> = {
     heatOrangeGreen: 'Naranja / Verde',
     heatBlueOrange: 'Azul / Naranja',
     heatOrangeBlue: 'Naranja / Azul',
+    heatGrayRed: 'Gris / Rojo',
+    heatRedGray: 'Rojo / Gris',
     animations: 'Animaciones',
     twoEyes: 'Dos ojos',
     wallModel: 'Muro',

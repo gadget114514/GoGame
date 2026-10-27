@@ -2,6 +2,7 @@ import { BLACK, WHITE, type Goban } from '../game/Goban';
 import type { Evaluation } from '../ai/KataGoEngine';
 import { starPoints, COORD_LETTERS } from '../game/BoardSize';
 import { heatColor, type HeatmapTheme } from './heatmap';
+import { boardPalette, type BoardColor } from './boardTheme';
 import { pieceRank } from './pieceRank';
 import { detectTwoEyes } from '../game/eyes';
 
@@ -71,6 +72,7 @@ export class Board2D {
   private evaluation: Evaluation | null = null;
   private showHeatmap = true;
   private heatmapTheme: HeatmapTheme = 'green-orange';
+  private boardColor: BoardColor = 'wood';
   private showEyeHighlight = false;
   private clickHandler: ((index: number) => void) | null = null;
   private hoverHandler: ((index: number | null) => void) | null = null;
@@ -130,7 +132,8 @@ export class Board2D {
     evaluation: Evaluation | null,
     showHeatmap = true,
     showEyeHighlight = false,
-    heatmapTheme: HeatmapTheme = 'green-orange'
+    heatmapTheme: HeatmapTheme = 'green-orange',
+    boardColor: BoardColor = 'wood'
   ): void {
     if (goban.moves.length === this.prevMoveCount + 1 && goban.lastMove !== null) {
       this.lastMoveAnimStartTime = performance.now();
@@ -141,6 +144,7 @@ export class Board2D {
     this.showHeatmap = showHeatmap;
     this.showEyeHighlight = showEyeHighlight;
     this.heatmapTheme = heatmapTheme;
+    this.boardColor = boardColor;
     if (goban.size !== this.size) {
       this.size = goban.size;
       this.layout();
@@ -201,21 +205,22 @@ export class Board2D {
     const x0 = this.originX - pad;
     const y0 = this.originY - pad;
     const boardExtent = span + pad * 2;
+    const palette = boardPalette(this.boardColor);
 
     // Board drop shadow
     ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
     ctx.shadowBlur = Math.max(16, this.cell * 0.5);
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = Math.max(6, this.cell * 0.18);
-    ctx.fillStyle = '#c99755';
+    ctx.fillStyle = palette.surface;
     ctx.fillRect(x0, y0, boardExtent, boardExtent);
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
 
-    // Board wood rim border
-    ctx.strokeStyle = '#8a5e2f';
+    // Board rim border
+    ctx.strokeStyle = palette.rim;
     ctx.lineWidth = Math.max(1.5, this.cell * 0.04);
     ctx.strokeRect(x0, y0, boardExtent, boardExtent);
 
@@ -241,7 +246,7 @@ export class Board2D {
       const actualCol = isWhite ? this.size - 1 - i : i;
       const isColActive = actualCol === lastCol;
 
-      ctx.fillStyle = isColActive ? '#d97706' : '#221408';
+      ctx.fillStyle = isColActive ? palette.coordActive : palette.coord;
       ctx.font = isColActive
         ? `bold ${Math.max(12, this.cell * 0.38)}px "Segoe UI", -apple-system, system-ui, sans-serif`
         : `700 ${Math.max(11, this.cell * 0.34)}px "Segoe UI", -apple-system, system-ui, sans-serif`;
@@ -257,7 +262,7 @@ export class Board2D {
       const actualRow = isWhite ? this.size - 1 - i : i;
       const isRowActive = actualRow === lastRow;
 
-      ctx.fillStyle = isRowActive ? '#d97706' : '#221408';
+      ctx.fillStyle = isRowActive ? palette.coordActive : palette.coord;
       ctx.font = isRowActive
         ? `bold ${Math.max(12, this.cell * 0.38)}px "Segoe UI", -apple-system, system-ui, sans-serif`
         : `700 ${Math.max(11, this.cell * 0.34)}px "Segoe UI", -apple-system, system-ui, sans-serif`;
@@ -267,7 +272,7 @@ export class Board2D {
     }
 
     // Grid.
-    ctx.strokeStyle = 'rgba(60, 38, 18, 0.85)';
+    ctx.strokeStyle = palette.grid;
     ctx.lineWidth = Math.max(1, this.cell * 0.035);
     ctx.beginPath();
     for (let i = 0; i < this.size; i++) {
@@ -282,7 +287,7 @@ export class Board2D {
     ctx.stroke();
 
     // Star points.
-    ctx.fillStyle = 'rgba(50, 32, 15, 0.9)';
+    ctx.fillStyle = palette.star;
     for (const index of starPoints(this.size as 9 | 13 | 19)) {
       const row = Math.floor(index / this.size);
       const col = index % this.size;

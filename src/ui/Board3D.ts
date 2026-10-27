@@ -5,7 +5,9 @@ import {
   DirectionalLight,
   DynamicTexture,
   Engine,
+  GlowLayer,
   HemisphericLight,
+  MaterialPluginBase,
   Mesh,
   MeshBuilder,
   ParticleSystem,
@@ -17,7 +19,10 @@ import {
   VertexBuffer,
   type AnimationGroup,
   type AssetContainer,
-  type Node
+  type LinesMesh,
+  type Material,
+  type Node,
+  type UniformBuffer
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { BLACK, WHITE, type Goban } from '../game/Goban';
@@ -25,6 +30,7 @@ import { starPoints, COORD_LETTERS, type BoardSize } from '../game/BoardSize';
 import type { Evaluation } from '../ai/KataGoEngine';
 import { detectTwoEyes, type EyeAnalysis } from '../game/eyes';
 import { heatColor, type HeatmapTheme } from './heatmap';
+import { boardPalette, type BoardColor } from './boardTheme';
 import { pieceRank } from './pieceRank';
 
 export type PieceStyle =
@@ -35,6 +41,7 @@ export type PieceStyle =
   | 'quirky-animals'
   | 'stones';
 export type DeadStoneStyle = 'cube' | 'stone';
+export type CaptureEffect = 'shatter' | 'dissolve' | 'height';
 
 export interface RenderState {
   goban: Goban;
@@ -43,22 +50,27 @@ export interface RenderState {
   opponentColor: number | null;
   showHeatmap: boolean;
   heatmapTheme: HeatmapTheme;
+  boardColor: BoardColor;
   animations: boolean;
   showTwoEyeHighlight: boolean;
   wallModel: WallModel;
   trueEyeModel: TrueEyeModel;
   showFalseEyeModels: boolean;
+  captureEffect: CaptureEffect;
 }
 
 export type WallModel = 'off' | 'seaweed' | 'fence';
 export type TrueEyeModel = 'off' | 'cute' | 'trueeye';
 type EyeModelKind = 'seaweed' | 'fence' | 'cute' | 'trueeye' | 'falseeye';
 
+type AlertAnimation = 'walk' | 'run';
+
 interface PieceHandle {
   root: TransformNode;
   rank: number;
   color: number;
   dead: boolean;
+  alert: AlertAnimation | null;
 }
 
 interface PieceMetrics {
@@ -72,6 +84,44 @@ interface PendingPlacement {
   root: TransformNode;
   color: number;
   cancel: () => void;
+}
+
+class DissolveMaterialPlugin extends MaterialPluginBase {
+  progress = 0;
+
+  constructor(material: Material) {
+    super(material, 'Dissolve', 200, {}, true);
+  }
+
+  getClassName(): string {
+    return 'DissolveMaterialPlugin';
+  }
+
+  getUniforms(): {
+    ubo: Array<{ name: string; size: number; type: string }>;
+  } {
+    return {
+      ubo: [{ name: 'dissolveProgress', size: 1, type: 'float' }]
+    };
+  }
+
+  bindForSubMesh(uniformBuffer: UniformBuffer): void {
+    uniformBuffer.updateFloat('dissolveProgress', this.progress);
+  }
+
+  getCustomCode(shaderType: string): { [pointName: string]: string } | null {
+    if (shaderType !== 'fragment') return null;
+    return {
+      CUSTOM_FRAGMENT_DEFINITIONS: `
+float dissolveNoise(vec3 p) {
+  p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
+  p *= 17.0;
+  return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+}`,
+      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
+if (dissolveNoise(floor(vPositionW * 24.0)) < dissolveProgress) discard;`
+    };
+  }
 }
 
 const PIECE_FILES = ['pawn', 'knight', 'bishop', 'rook', 'queen', 'king'] as const;
@@ -100,6 +150,20 @@ const PIECE_TARGET_HEIGHTS: Record<PieceFile, number> = {
   king: 1.12
 };
 
+const PIECE_SCALE_MULTIPLIERS: Partial<
+  Record<PieceStyle, Partial<Record<PieceFile, number>>>
+> = {};
+
+const PIECE_CENTER_OFFSETS: Partial<
+  Record<PieceStyle, Partial<Record<PieceFile, { x?: number; z?: number }>>>
+> = {
+  'animal-bag': { rook: { x: 0.3 } }
+};
+
+const IDLE_ANIMATION_SPEED = 0.5;
+const WALK_ANIMATION_SPEED = 0.75;
+const RUN_ANIMATION_SPEED = 1.15;
+
 const SPACING = 1;
 const TEXTURE_SIZE = 1024;
 const BLACK_MOVE_COLOR = new Color3(1.0, 0.58, 0.12);
@@ -125,6 +189,7 @@ const EYE_MODEL_HEIGHTS: Record<EyeModelKind, number> = {
   trueeye: 0.55,
   falseeye: 1.2
 };
+const FENCE_MODEL_SCALE = 0.6;
 
 export class Board3D {
   private engine: Engine;
@@ -140,11 +205,13 @@ export class Board3D {
 
   private boardNodes: Node[] = [];
   private boardMesh: Mesh | null = null;
+  private gridMesh: LinesMesh | null = null;
   private heatPlane: Mesh | null = null;
   private heatTexture: DynamicTexture | null = null;
   private coordPlane: Mesh | null = null;
   private coordTexture: DynamicTexture | null = null;
 
+  private boardColor: BoardColor = 'wood';
   private currentStyle: PieceStyle = 'quirky-animals';
   private deadStoneStyle: DeadStoneStyle = 'cube';
   private perspective: 'black' | 'white' = 'black';
@@ -177,6 +244,8 @@ export class Board3D {
   private lastMoveNumber = -1;
   private lastMovePulseAt = 0;
   private lastMoveEmphasis = 1;
+  private glowLayer: GlowLayer;
+  private captureCleanups = new Set<() => void>();
   private pendingPlacements = new Map<number, PendingPlacement>();
   private effectSeed = 0;
 
@@ -227,6 +296,8 @@ export class Board3D {
     this.starMaterial = new StandardMaterial('star', this.scene);
     this.starMaterial.diffuseColor = new Color3(0.11, 0.075, 0.045);
     this.starMaterial.specularColor = Color3.Black();
+
+    this.setBoardColor('wood');
 
     this.blackMaterial = new StandardMaterial('stone-black', this.scene);
     this.blackMaterial.diffuseColor = new Color3(0.045, 0.045, 0.06);
@@ -281,7 +352,7 @@ export class Board3D {
     this.lastMoveGlowMaterial.emissiveColor = BLACK_MOVE_COLOR;
     this.lastMoveGlowMaterial.specularColor = Color3.Black();
     this.lastMoveGlowMaterial.disableLighting = true;
-    this.lastMoveGlowMaterial.alpha = 0.18;
+    this.lastMoveGlowMaterial.alpha = 0.24;
     this.lastMoveGlowMaterial.backFaceCulling = false;
 
     const ring = MeshBuilder.CreateTorus(
@@ -296,7 +367,7 @@ export class Board3D {
 
     const glow = MeshBuilder.CreateDisc(
       'last-move-glow',
-      { radius: 0.58, tessellation: 48 },
+      { radius: 0.64, tessellation: 48 },
       this.scene
     );
     glow.rotation.x = -Math.PI / 2;
@@ -325,6 +396,16 @@ export class Board3D {
     pillar.isVisible = false;
     this.lastMovePillar = pillar;
 
+    this.glowLayer = new GlowLayer('last-move-glow-layer', this.scene, {
+      mainTextureFixedSize: 512,
+      blurKernelSize: 48
+    });
+    this.glowLayer.intensity = 0.5;
+    this.glowLayer.addIncludedOnlyMesh(this.lastMoveRing);
+    this.glowLayer.addIncludedOnlyMesh(this.lastMoveGlow);
+    this.glowLayer.addIncludedOnlyMesh(this.lastMoveBeacon);
+    this.glowLayer.addIncludedOnlyMesh(this.lastMovePillar);
+
     const hoverMat = new StandardMaterial('hover-preview-mat', this.scene);
     hoverMat.diffuseColor = Color3.Black();
     hoverMat.emissiveColor = new Color3(1.0, 0.82, 0.25);
@@ -343,6 +424,7 @@ export class Board3D {
     this.hoverMarker = hoverRing;
 
     this.scene.onBeforeRenderObservable.add(() => this.animateLastMoveMarker());
+    this.scene.onBeforeRenderObservable.add(() => this.animateAlertPieces());
 
     this.attachPointer();
     window.addEventListener('resize', this.resize);
@@ -388,6 +470,7 @@ export class Board3D {
       return;
     }
     this.currentStyle = style;
+    this.cancelCaptureEffects();
     if (style !== 'stones') {
       await this.ensureStyleLoaded(style);
     }
@@ -588,12 +671,14 @@ export class Board3D {
   }
 
   setBoardSize(size: BoardSize): void {
+    this.cancelCaptureEffects();
     this.size = size;
     this.pendingPlacements.forEach((pending) => pending.cancel());
     this.pendingPlacements.clear();
     for (const node of this.boardNodes) node.dispose();
     this.boardNodes = [];
     this.boardMesh = null;
+    this.gridMesh = null;
     this.heatPlane = null;
     this.heatTexture = null;
     this.coordPlane = null;
@@ -630,9 +715,10 @@ export class Board3D {
       lines.push([new Vector3(offset, 0.012, -half), new Vector3(offset, 0.012, half)]);
     }
     const grid = MeshBuilder.CreateLineSystem('grid', { lines }, this.scene);
-    grid.color = new Color3(0.13, 0.085, 0.045);
+    grid.color = Color3.FromHexString(boardPalette(this.boardColor).grid);
     grid.isPickable = false;
     this.boardNodes.push(grid);
+    this.gridMesh = grid;
 
     for (const index of starPoints(this.size)) {
       const row = Math.floor(index / n);
@@ -730,6 +816,7 @@ export class Board3D {
   update(state: RenderState): void {
     this.lastState = state;
     if (!this.ready) return;
+    if (state.boardColor !== this.boardColor) this.setBoardColor(state.boardColor);
     if (state.goban.size !== this.size) this.setBoardSize(state.goban.size);
     if (state.animations !== this.animationsEnabled) {
       this.animationsEnabled = state.animations;
@@ -877,9 +964,11 @@ export class Board3D {
           }
           entries.animationGroups.forEach((group) => group.dispose());
           entries.rootNodes.forEach((node) => node.dispose());
+          const targetHeight =
+            EYE_MODEL_HEIGHTS[kind] * (kind === 'fence' ? FENCE_MODEL_SCALE : 1);
           this.eyeScales.set(
             kind,
-            height > 0 ? EYE_MODEL_HEIGHTS[kind] / height : 1
+            height > 0 ? targetHeight / height : 1
           );
           this.eyeContainers.set(kind, container);
         } catch (error) {
@@ -1004,35 +1093,62 @@ export class Board3D {
 
       if (state.wallModel !== 'off') {
         const [first, second] = group.pair;
-        const firstRow = Math.floor(first / n);
-        const firstCol = first % n;
-        const secondRow = Math.floor(second / n);
-        const secondCol = second % n;
-        const ax = this.worldCoordinateX(firstCol);
-        const az = this.worldCoordinateZ(firstRow);
-        const bx = this.worldCoordinateX(secondCol);
-        const bz = this.worldCoordinateZ(secondRow);
-        const dx = bx - ax;
-        const dz = bz - az;
-        const length = Math.hypot(dx, dz) || 1;
-        const offset = state.wallModel === 'seaweed' ? 0.16 : 0;
-
-        const model = this.createEyeDecoration(state.wallModel);
-        if (model) {
-          model.position.set(
-            (ax + bx) / 2 - (dz / length) * offset,
-            0.02,
-            (az + bz) / 2 + (dx / length) * offset
-          );
-          if (state.wallModel === 'fence') {
-            model.rotation.y = Math.atan2(-dz, dx);
+        if (state.wallModel === 'fence') {
+          for (const placement of this.fencePlacements(first, second)) {
+            const model = this.createEyeDecoration('fence');
+            if (!model) continue;
+            model.position.set(placement.x, 0.02, placement.z);
+            model.rotation.y = placement.angle;
+            this.eyeDecorations.push(model);
           }
-          this.eyeDecorations.push(model);
+        } else {
+          const firstRow = Math.floor(first / n);
+          const firstCol = first % n;
+          const secondRow = Math.floor(second / n);
+          const secondCol = second % n;
+          const ax = this.worldCoordinateX(firstCol);
+          const az = this.worldCoordinateZ(firstRow);
+          const bx = this.worldCoordinateX(secondCol);
+          const bz = this.worldCoordinateZ(secondRow);
+          const dx = bx - ax;
+          const dz = bz - az;
+          const length = Math.hypot(dx, dz) || 1;
+
+          const model = this.createEyeDecoration(state.wallModel);
+          if (model) {
+            model.position.set(
+              (ax + bx) / 2 - (dz / length) * 0.16,
+              0.02,
+              (az + bz) / 2 + (dx / length) * 0.16
+            );
+            this.eyeDecorations.push(model);
+          }
         }
       }
     }
 
     this.eyeDecorKey = key;
+  }
+
+  private fencePlacements(
+    first: number,
+    second: number
+  ): Array<{ x: number; z: number; angle: number }> {
+    const n = this.size;
+    const firstRow = Math.floor(first / n);
+    const firstCol = first % n;
+    const secondRow = Math.floor(second / n);
+    const secondCol = second % n;
+    const x1 = this.worldCoordinateX(firstCol);
+    const z1 = this.worldCoordinateZ(firstRow);
+    const x2 = this.worldCoordinateX(secondCol);
+    const z2 = this.worldCoordinateZ(secondRow);
+    const angle = Math.atan2(-(z2 - z1), x2 - x1);
+
+    return [
+      { x: x1, z: z1, angle },
+      { x: x2, z: z2, angle }
+    ];
   }
 
   private clearEyeDecorations(): void {
@@ -1045,6 +1161,7 @@ export class Board3D {
     const n = goban.size;
     const moveDelta = this.lastMoveNumber < 0 ? 0 : goban.moveNumber - this.lastMoveNumber;
     const isNewMove = moveDelta === 1;
+    const libertyCounts = this.countGroupLiberties(goban);
 
     for (let index = 0; index < n * n; index++) {
       const color = goban.board[index];
@@ -1059,6 +1176,8 @@ export class Board3D {
         if (this.pendingPlacements.has(index)) continue;
 
         const { rank, dead } = this.rankFor(index, color, state);
+        const alert = dead ? null : this.alertForLiberties(libertyCounts.get(index) ?? 0);
+        if (existing) existing.alert = alert;
         if (
           !existing ||
           existing.color !== color ||
@@ -1089,10 +1208,10 @@ export class Board3D {
 
           const root = this.createPieceNode(rank, color, index, dead);
           root.position.set(targetX, targetY, targetZ);
-          this.pieces.set(index, { root, rank, color, dead });
+          this.pieces.set(index, { root, rank, color, dead, alert });
         }
       } else if (existing) {
-        if (isNewMove) this.explodePiece(existing);
+        if (isNewMove) this.beginCaptureEffect(existing, state.captureEffect);
         else this.disposePiece(existing.root);
         this.pieces.delete(index);
       }
@@ -1105,6 +1224,53 @@ export class Board3D {
   private rankFor(index: number, color: number, state: RenderState): { rank: number; dead: boolean } {
     const ownership = state.evaluation?.ownership[index] ?? 0;
     return pieceRank(ownership, color, index === state.goban.lastMove);
+  }
+
+  private countGroupLiberties(goban: Goban): Map<number, number> {
+    const counts = new Map<number, number>();
+    const seen = new Uint8Array(goban.area);
+    for (let index = 0; index < goban.area; index++) {
+      const color = goban.board[index];
+      if ((color !== BLACK && color !== WHITE) || seen[index]) continue;
+      const group = goban.groupAt(index);
+      const liberties = group.liberties.size;
+      for (const stone of group.stones) {
+        seen[stone] = 1;
+        counts.set(stone, liberties);
+      }
+    }
+    return counts;
+  }
+
+  private alertForLiberties(liberties: number): AlertAnimation | null {
+    if (liberties === 1) return 'run';
+    if (liberties === 2) return 'walk';
+    return null;
+  }
+
+  private animateAlertPieces(): void {
+    const now = performance.now() / 1000;
+    for (const [index, piece] of this.pieces) {
+      const animation = this.pieceAnimations.get(piece.root.uniqueId)?.[0];
+      if (!this.animationsEnabled || !piece.alert) {
+        if (animation) animation.speedRatio = IDLE_ANIMATION_SPEED;
+        piece.root.position.y = 0.03;
+        piece.root.rotation.z = 0;
+        continue;
+      }
+
+      if (piece.alert === 'run') {
+        if (animation) animation.speedRatio = RUN_ANIMATION_SPEED;
+        const phase = now * 9 + index;
+        piece.root.position.y = 0.03 + Math.abs(Math.sin(phase)) * 0.06;
+        piece.root.rotation.z = Math.sin(phase) * 0.08;
+      } else {
+        if (animation) animation.speedRatio = WALK_ANIMATION_SPEED;
+        const phase = now * 4 + index;
+        piece.root.position.y = 0.03 + Math.abs(Math.sin(phase)) * 0.03;
+        piece.root.rotation.z = Math.sin(phase) * 0.045;
+      }
+    }
   }
 
   private updateLastMoveMarker(state: RenderState, isNewMove: boolean): void {
@@ -1126,8 +1292,10 @@ export class Board3D {
     const x = this.worldCoordinateX(col);
     const z = this.worldCoordinateZ(row);
     const color = state.goban.board[last] === WHITE ? WHITE_MOVE_COLOR : BLACK_MOVE_COLOR;
-    this.lastMoveEmphasis =
-      state.opponentColor !== null && state.goban.board[last] === state.opponentColor ? 1.3 : 1;
+    const isOpponentMove =
+      state.opponentColor !== null && state.goban.board[last] === state.opponentColor;
+    this.lastMoveEmphasis = isOpponentMove ? 1.3 : 1;
+    this.glowLayer.intensity = isOpponentMove ? 1.0 : 0.5;
 
     this.lastMoveMaterial.emissiveColor.copyFrom(color);
     this.lastMoveGlowMaterial.emissiveColor.copyFrom(color);
@@ -1163,6 +1331,7 @@ export class Board3D {
 
     const lastCol = lastMove !== null ? lastMove % n : -1;
     const lastRow = lastMove !== null ? Math.floor(lastMove / n) : -1;
+    const palette = boardPalette(this.boardColor);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1182,7 +1351,7 @@ export class Board3D {
       const actualCol = isWhite ? n - 1 - i : i;
       const isColActive = actualCol === lastCol;
 
-      ctx.fillStyle = isColActive ? '#d97706' : '#221408';
+      ctx.fillStyle = isColActive ? palette.coordActive : palette.coord;
       ctx.font = isColActive
         ? `bold ${Math.max(16, Math.round(28 * (19 / n)))}px "Segoe UI", -apple-system, system-ui, sans-serif`
         : `700 ${Math.max(14, Math.round(24 * (19 / n)))}px "Segoe UI", -apple-system, system-ui, sans-serif`;
@@ -1198,7 +1367,7 @@ export class Board3D {
       const actualRow = isWhite ? n - 1 - i : i;
       const isRowActive = actualRow === lastRow;
 
-      ctx.fillStyle = isRowActive ? '#d97706' : '#221408';
+      ctx.fillStyle = isRowActive ? palette.coordActive : palette.coord;
       ctx.font = isRowActive
         ? `bold ${Math.max(16, Math.round(28 * (19 / n)))}px "Segoe UI", -apple-system, system-ui, sans-serif`
         : `700 ${Math.max(14, Math.round(24 * (19 / n)))}px "Segoe UI", -apple-system, system-ui, sans-serif`;
@@ -1246,12 +1415,26 @@ export class Board3D {
 
   setDeadStoneStyle(style: DeadStoneStyle): void {
     if (this.deadStoneStyle === style) return;
+    this.cancelCaptureEffects();
     this.deadStoneStyle = style;
     this.pieces.forEach((piece) => this.disposePiece(piece.root));
     this.pieces.clear();
     if (this.lastState) {
       this.syncPieces(this.lastState);
     }
+  }
+
+  setBoardColor(color: BoardColor): void {
+    this.boardColor = color;
+    const palette = boardPalette(color);
+    const surface = Color3.FromHexString(palette.surface);
+    this.woodMaterial.diffuseColor = surface;
+    this.woodMaterial.emissiveColor = surface.scale(0.04);
+    this.starMaterial.diffuseColor = Color3.FromHexString(palette.star);
+    if (this.gridMesh) {
+      this.gridMesh.color = Color3.FromHexString(palette.grid);
+    }
+    this.drawCoordinates(this.lastState?.goban.lastMove ?? null);
   }
 
   private createPieceNode(rank: number, color: number, index: number, dead: boolean): TransformNode {
@@ -1296,6 +1479,7 @@ export class Board3D {
       for (const group of entries.animationGroups) {
         if (group !== idle) group.dispose();
       }
+      idle.speedRatio = IDLE_ANIMATION_SPEED;
       idle.start(true);
       this.pieceAnimations.set(wrapper.uniqueId, [idle]);
     } else {
@@ -1319,16 +1503,28 @@ export class Board3D {
 
     const metrics = this.styleMetrics.get(this.currentStyle)?.get(file);
     const { min, max } = root.getHierarchyBoundingVectors(true);
-    const scale = metrics?.scale ?? 1.05 / (max.y - min.y || 1);
+    const scaleMultiplier =
+      PIECE_SCALE_MULTIPLIERS[this.currentStyle]?.[file] ?? 1;
+    const scale =
+      (metrics?.scale ?? 1.05 / (max.y - min.y || 1)) * scaleMultiplier;
     root.scaling.setAll(scale);
 
+    const offset = PIECE_CENTER_OFFSETS[this.currentStyle]?.[file];
     if (metrics) {
-      root.position.set(-metrics.centerX, -metrics.baseY, -metrics.centerZ);
+      root.position.set(
+        -metrics.centerX * scaleMultiplier + (offset?.x ?? 0),
+        -metrics.baseY * scaleMultiplier,
+        -metrics.centerZ * scaleMultiplier + (offset?.z ?? 0)
+      );
     } else {
       const centered = root.getHierarchyBoundingVectors(true);
       const centerX = (centered.min.x + centered.max.x) / 2;
       const centerZ = (centered.min.z + centered.max.z) / 2;
-      root.position.set(-centerX, -centered.min.y, -centerZ);
+      root.position.set(
+        -centerX + (offset?.x ?? 0),
+        -centered.min.y,
+        -centerZ + (offset?.z ?? 0)
+      );
     }
 
     return wrapper;
@@ -1592,7 +1788,10 @@ export class Board3D {
     root.position.set(targetX, targetY, targetZ);
     const replaced = this.pieces.get(index);
     if (replaced) this.disposePiece(replaced.root);
-    this.pieces.set(index, { root, rank, color, dead });
+    const alert = dead
+      ? null
+      : this.alertForLiberties(state.goban.groupAt(index).liberties.size);
+    this.pieces.set(index, { root, rank, color, dead, alert });
     this.animatePieceEntrance(index, root, dramatic);
 
     const pieceColor = color === WHITE ? WHITE_MOVE_COLOR : BLACK_MOVE_COLOR;
@@ -1639,6 +1838,94 @@ export class Board3D {
         root.scaling.copyFrom(base);
       }
     });
+  }
+
+  private beginCaptureEffect(piece: PieceHandle, effect: CaptureEffect): void {
+    if (effect === 'dissolve') {
+      this.beginDissolveCapture(piece);
+    } else if (effect === 'height') {
+      this.beginHeightCapture(piece);
+    } else {
+      this.explodePiece(piece);
+    }
+  }
+
+  private cancelCaptureEffects(): void {
+    for (const cleanup of [...this.captureCleanups]) cleanup();
+    this.captureCleanups.clear();
+  }
+
+  private beginDissolveCapture(piece: PieceHandle): void {
+    const position = piece.root.position.clone();
+    const color =
+      piece.color === BLACK ? new Color3(1.0, 0.55, 0.12) : new Color3(0.45, 0.82, 1.0);
+    this.spawnBurst(position.add(new Vector3(0, 0.24, 0)), color, 36, 2.0, 0.7);
+
+    const clones: Material[] = [];
+    const plugins: DissolveMaterialPlugin[] = [];
+    const meshes = piece.root.getChildMeshes(false);
+    if (piece.root instanceof Mesh) meshes.push(piece.root);
+    for (const mesh of meshes) {
+      const material = mesh.material;
+      if (!material) continue;
+      const clone = material.clone(`${material.name}-dissolve-${this.effectSeed++}`);
+      if (!clone) continue;
+      mesh.material = clone;
+      clones.push(clone);
+      plugins.push(new DissolveMaterialPlugin(clone));
+    }
+
+    const duration = 700;
+    let elapsed = 0;
+    let finished = false;
+    const observer = this.scene.onBeforeRenderObservable.add(() => {
+      if (finished) return;
+      elapsed += Math.min(50, this.engine.getDeltaTime());
+      const t = Math.min(1, elapsed / duration);
+      const eased = t * t;
+      for (const plugin of plugins) plugin.progress = eased;
+      if (t >= 1) cleanup();
+    });
+
+    const cleanup = () => {
+      if (finished) return;
+      finished = true;
+      this.scene.onBeforeRenderObservable.remove(observer);
+      for (const clone of clones) clone.dispose();
+      this.disposePiece(piece.root);
+      this.captureCleanups.delete(cleanup);
+    };
+    this.captureCleanups.add(cleanup);
+  }
+
+  private beginHeightCapture(piece: PieceHandle): void {
+    const position = piece.root.position.clone();
+    const baseScale = piece.root.scaling.clone();
+    const color =
+      piece.color === BLACK ? new Color3(0.88, 0.62, 0.3) : new Color3(0.72, 0.84, 0.95);
+    this.spawnBurst(position.add(new Vector3(0, 0.08, 0)), color, 26, 1.2, 0.55);
+
+    const duration = 600;
+    let elapsed = 0;
+    let finished = false;
+    const observer = this.scene.onBeforeRenderObservable.add(() => {
+      if (finished) return;
+      elapsed += Math.min(50, this.engine.getDeltaTime());
+      const t = Math.min(1, elapsed / duration);
+      const eased = 1 - Math.pow(1 - t, 2);
+      piece.root.scaling.y = baseScale.y * (1 - eased);
+      piece.root.position.y = position.y - 0.06 * eased;
+      if (t >= 1) cleanup();
+    });
+
+    const cleanup = () => {
+      if (finished) return;
+      finished = true;
+      this.scene.onBeforeRenderObservable.remove(observer);
+      this.disposePiece(piece.root);
+      this.captureCleanups.delete(cleanup);
+    };
+    this.captureCleanups.add(cleanup);
   }
 
   private explodePiece(piece: PieceHandle): void {

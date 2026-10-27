@@ -4,6 +4,7 @@ import { KataGoEngine, type Evaluation } from '../ai/KataGoEngine';
 import type { AILevel } from '../ai/registry';
 import {
   Board3D,
+  type CaptureEffect,
   type DeadStoneStyle,
   type PieceStyle,
   type RenderState,
@@ -22,6 +23,8 @@ import {
 import { generateSGF, parseSGF } from '../game/sgf';
 import { EvalGraph, type EvalPoint } from './EvalGraph';
 import { isHeatmapTheme, type HeatmapTheme } from './heatmap';
+import { isBoardColor, type BoardColor } from './boardTheme';
+import { STYLE_PRESETS } from './stylePresets';
 import thirdpartyText from '../../thirdparty.txt?raw';
 
 interface Elements {
@@ -32,6 +35,8 @@ interface Elements {
   playerSide: HTMLSelectElement;
   pieceStyle: HTMLSelectElement;
   deadStoneStyle: HTMLSelectElement;
+  captureEffect: HTMLSelectElement;
+  boardColor: HTMLSelectElement;
   languageSelect: HTMLSelectElement;
   toggleHoverEval: HTMLInputElement;
   toggleHeatmap: HTMLInputElement;
@@ -109,6 +114,8 @@ export class GameController {
   private playerSide: 'black' | 'white' = 'black';
   private pieceStyle: PieceStyle = 'quirky-animals';
   private deadStoneStyle: DeadStoneStyle = 'cube';
+  private captureEffect: CaptureEffect = 'shatter';
+  private boardColor: BoardColor = 'wood';
   private view: ViewMode = '3d';
   private evaluation: Evaluation | null = null;
   private busy = false;
@@ -155,6 +162,8 @@ export class GameController {
       playerSide: requireElement('player-side'),
       pieceStyle: requireElement('piece-style'),
       deadStoneStyle: requireElement('dead-stone-style'),
+      captureEffect: requireElement('capture-effect'),
+      boardColor: requireElement('board-color'),
       languageSelect: requireElement('language-select'),
       toggleHoverEval: requireElement('toggle-hover-eval'),
       toggleHeatmap: requireElement('toggle-heatmap'),
@@ -205,6 +214,8 @@ export class GameController {
     this.playerSide = this.config.playerSide;
     this.pieceStyle = this.config.pieceStyle;
     this.deadStoneStyle = this.config.deadStoneStyle;
+    this.captureEffect = this.config.captureEffect;
+    this.boardColor = this.config.boardColor;
     this.view = this.config.view;
     this.hoverEvalEnabled = this.config.hoverEval;
     this.heatmapEnabled = this.config.heatmap;
@@ -223,6 +234,8 @@ export class GameController {
     this.els.playerSide.value = this.playerSide;
     this.els.pieceStyle.value = this.pieceStyle;
     this.els.deadStoneStyle.value = this.deadStoneStyle;
+    this.els.captureEffect.value = this.captureEffect;
+    this.els.boardColor.value = this.boardColor;
     this.els.languageSelect.value = this.config.language;
     this.els.toggleHoverEval.checked = this.hoverEvalEnabled;
     this.els.toggleHeatmap.checked = this.heatmapEnabled;
@@ -310,8 +323,8 @@ export class GameController {
     });
     this.els.pieceStyle.addEventListener('change', () => {
       this.pieceStyle = (this.els.pieceStyle.value as PieceStyle) || 'quirky-animals';
+      this.applyStylePreset(this.pieceStyle);
       void this.board3d.setPieceStyle(this.pieceStyle);
-      this.setDeadStoneStyle(this.pieceStyle === 'stones' ? 'stone' : 'cube');
       const legend = document.getElementById('rank-legend');
       if (legend) {
         legend.style.display = this.pieceStyle === 'stones' ? 'none' : '';
@@ -320,6 +333,19 @@ export class GameController {
     });
     this.els.deadStoneStyle.addEventListener('change', () => {
       this.setDeadStoneStyle(this.els.deadStoneStyle.value === 'stone' ? 'stone' : 'cube');
+    });
+    this.els.captureEffect.addEventListener('change', () => {
+      const value = this.els.captureEffect.value;
+      this.captureEffect =
+        value === 'dissolve' || value === 'height' ? value : 'shatter';
+      this.persistConfig();
+      this.render();
+    });
+    this.els.boardColor.addEventListener('change', () => {
+      const value = this.els.boardColor.value;
+      this.boardColor = isBoardColor(value) ? value : 'wood';
+      this.persistConfig();
+      this.render();
     });
     this.els.languageSelect.addEventListener('change', () => {
       const lang = this.els.languageSelect.value as Language;
@@ -487,6 +513,24 @@ export class GameController {
       ?.classList.toggle('stone', style === 'stone');
   }
 
+  private applyStylePreset(style: PieceStyle): void {
+    const preset = STYLE_PRESETS[style];
+    this.wallModel = preset.wallModel;
+    this.trueEyeModel = preset.trueEyeModel;
+    this.falseEyeModelsEnabled = preset.falseEyeModels;
+    this.boardColor = preset.boardColor;
+    this.heatmapTheme = preset.heatmapTheme;
+    this.captureEffect = preset.captureEffect;
+    this.els.wallModel.value = preset.wallModel;
+    this.els.trueEyeModel.value = preset.trueEyeModel;
+    this.els.toggleFalseEyeModels.checked = preset.falseEyeModels;
+    this.els.boardColor.value = preset.boardColor;
+    this.els.heatmapTheme.value = preset.heatmapTheme;
+    this.els.captureEffect.value = preset.captureEffect;
+    this.setDeadStoneStyle(preset.deadStoneStyle);
+    this.render();
+  }
+
   private setEvalGraphEnabled(enabled: boolean): void {
     this.evalGraphEnabled = enabled;
     this.persistConfig();
@@ -508,6 +552,8 @@ export class GameController {
       playerSide: this.playerSide,
       pieceStyle: this.pieceStyle,
       deadStoneStyle: this.deadStoneStyle,
+      captureEffect: this.captureEffect,
+      boardColor: this.boardColor,
       language: getLanguage(),
       view: this.view,
       hoverEval: this.hoverEvalEnabled,
@@ -1080,11 +1126,13 @@ export class GameController {
       opponentColor: this.isManualMode() ? null : this.playerSide === 'black' ? WHITE : BLACK,
       showHeatmap: this.heatmapEnabled,
       heatmapTheme: this.heatmapTheme,
+      boardColor: this.boardColor,
       animations: this.animationsEnabled,
       showTwoEyeHighlight: this.eyeHighlightEnabled,
       wallModel: this.wallModel,
       trueEyeModel: this.trueEyeModel,
-      showFalseEyeModels: this.falseEyeModelsEnabled
+      showFalseEyeModels: this.falseEyeModelsEnabled,
+      captureEffect: this.captureEffect
     };
     this.board3d.update(state);
     this.board2d.update(
@@ -1092,7 +1140,8 @@ export class GameController {
       activeEval,
       this.heatmapEnabled,
       this.eyeHighlightEnabled,
-      this.heatmapTheme
+      this.heatmapTheme,
+      this.boardColor
     );
   }
 

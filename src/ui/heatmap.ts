@@ -2,13 +2,17 @@ export type HeatmapTheme =
   | 'green-orange'
   | 'orange-green'
   | 'blue-orange'
-  | 'orange-blue';
+  | 'orange-blue'
+  | 'gray-red'
+  | 'red-gray';
 
 export const HEATMAP_THEMES: readonly HeatmapTheme[] = [
   'green-orange',
   'orange-green',
   'blue-orange',
-  'orange-blue'
+  'orange-blue',
+  'gray-red',
+  'red-gray'
 ];
 
 const HEATMAP_PALETTES: Record<
@@ -18,7 +22,9 @@ const HEATMAP_PALETTES: Record<
   'green-orange': { black: [56, 198, 118], white: [245, 150, 50] },
   'orange-green': { black: [245, 150, 50], white: [56, 198, 118] },
   'blue-orange': { black: [56, 132, 220], white: [245, 150, 50] },
-  'orange-blue': { black: [245, 150, 50], white: [56, 132, 220] }
+  'orange-blue': { black: [245, 150, 50], white: [56, 132, 220] },
+  'gray-red': { black: [150, 150, 150], white: [226, 74, 62] },
+  'red-gray': { black: [226, 74, 62], white: [150, 150, 150] }
 };
 
 export function isHeatmapTheme(value: unknown): value is HeatmapTheme {
