@@ -1247,11 +1247,9 @@ export class Board3D {
           const bz = this.worldCoordinateZ(neighborRow);
           const dx = bx - ax;
           const dz = bz - az;
-          placements.push({
-            x: (ax + bx) / 2,
-            z: (az + bz) / 2,
-            angle: Math.atan2(-dz, dx)
-          });
+          const angle = Math.atan2(-dz, dx);
+          placements.push({ x: ax, z: az, angle });
+          placements.push({ x: bx, z: bz, angle });
         }
       }
     }
