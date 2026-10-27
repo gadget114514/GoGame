@@ -32,6 +32,8 @@ export interface Translations {
   trueEyeTrue: string;
   falseEyeModel: string;
   off: string;
+  settings: string;
+  settingsTitle: string;
   credits: string;
   creditsTitle: string;
   newGame: string;
@@ -134,6 +136,8 @@ const DICTIONARIES: Record<Language, Translations> = {
     trueEyeTrue: 'True Eye Flower',
     falseEyeModel: 'False Eye',
     off: 'Off',
+    settings: 'Settings',
+    settingsTitle: 'Game settings',
     credits: 'Credits',
     creditsTitle: 'Third-party credits',
     newGame: 'New',
@@ -231,6 +235,8 @@ const DICTIONARIES: Record<Language, Translations> = {
     trueEyeTrue: '本眼の花',
     falseEyeModel: '欠け眼',
     off: 'なし',
+    settings: '設定',
+    settingsTitle: 'ゲーム設定',
     credits: 'クレジット',
     creditsTitle: 'サードパーティのクレジット',
     newGame: '対局開始',
@@ -328,6 +334,8 @@ const DICTIONARIES: Record<Language, Translations> = {
     trueEyeTrue: 'Flor de ojo real',
     falseEyeModel: 'Ojo falso',
     off: 'Ninguno',
+    settings: 'Ajustes',
+    settingsTitle: 'Ajustes del juego',
     credits: 'Créditos',
     creditsTitle: 'Créditos de terceros',
     newGame: 'Nueva',

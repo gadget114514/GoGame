@@ -12,90 +12,7 @@
     <div id="app">
       <header id="toolbar">
         <div class="group">
-          <label><span data-i18n="board">Board</span>
-            <select id="board-size">
-              <option value="9" selected>9 &times; 9</option>
-              <option value="13">13 &times; 13</option>
-              <option value="19">19 &times; 19</option>
-            </select>
-          </label>
-          <label><span data-i18n="opponent">Opponent</span>
-            <select id="ai-level">
-              <option value="dan" data-i18n="dan" selected>KataGo (Dan)</option>
-              <option value="kyu" data-i18n="kyu">KataGo (Kyu)</option>
-              <option value="manual" data-i18n="manual">Manual (2P)</option>
-            </select>
-          </label>
-          <label><span data-i18n="playerSide">Side</span>
-            <select id="player-side">
-              <option value="black" data-i18n="sideBlack" selected>Black (First)</option>
-              <option value="white" data-i18n="sideWhite">White (Second)</option>
-            </select>
-          </label>
-          <label><span data-i18n="pieces">Pieces</span>
-            <select id="piece-style">
-              <option value="clayfoot" data-i18n="pieceClayfoot">Clayfoot Studios</option>
-              <option value="dark-yagami" data-i18n="pieceDarkYagami">Dark Yagami</option>
-              <option value="animal-bag" data-i18n="pieceAnimalBag">Animal Bag</option>
-              <option value="kenney-pets" data-i18n="pieceKenneyPets">Kenney Cube Pets</option>
-              <option value="quirky-animals" data-i18n="pieceQuirkyAnimals" selected>Quirky Animals</option>
-              <option value="stones" data-i18n="pieceStones">Traditional Stones</option>
-            </select>
-          </label>
-          <label><span data-i18n="deadStones">Dead Stones</span>
-            <select id="dead-stone-style">
-              <option value="cube" data-i18n="deadCube" selected>Cube</option>
-              <option value="stone" data-i18n="deadStone">Go Stone</option>
-            </select>
-          </label>
-          <label><span data-i18n="komi">Komi</span>
-            <input id="komi" type="number" step="0.5" min="0" max="20" value="7" />
-          </label>
-          <label class="toggle-control" id="label-hover-eval" title="Realtime ownership preview on mouse hover">
-            <input id="toggle-hover-eval" type="checkbox" checked />
-            <span data-i18n="hoverEval">Hover Eval</span>
-          </label>
-          <label class="toggle-control" id="label-heatmap" data-i18n-title="heatmapTitle" title="Territory heatmap">
-            <input id="toggle-heatmap" type="checkbox" checked />
-            <span data-i18n="heatmap">Territory</span>
-          </label>
-          <label class="toggle-control" id="label-eval-graph" title="Evaluation graph">
-            <input id="toggle-eval-graph" type="checkbox" checked />
-            <span data-i18n="evalGraph">Eval Graph</span>
-          </label>
-          <label class="toggle-control" id="label-eye-highlight" title="Highlight true eyes and two-eye groups">
-            <input id="toggle-eye-highlight" type="checkbox" checked />
-            <span data-i18n="twoEyes">Two Eyes</span>
-          </label>
-          <label id="label-wall-model" title="Model placed between paired true eyes">
-            <span data-i18n="wallModel">Wall</span>
-            <select id="wall-model">
-              <option value="off" data-i18n="off">Off</option>
-              <option value="seaweed" data-i18n="wallSeaweed">Seaweed</option>
-              <option value="fence" data-i18n="wallFence" selected>Fence</option>
-            </select>
-          </label>
-          <label id="label-true-eye-model" title="Model placed on each true eye">
-            <span data-i18n="trueEyeModel">True Eye</span>
-            <select id="true-eye-model">
-              <option value="off" data-i18n="off">Off</option>
-              <option value="cute" data-i18n="trueEyeCute">Cute Flower</option>
-              <option value="trueeye" data-i18n="trueEyeTrue" selected>True Eye Flower</option>
-            </select>
-          </label>
-          <label class="toggle-control" id="label-false-eye-models" title="Weed model on each living false eye">
-            <input id="toggle-false-eye-models" type="checkbox" checked />
-            <span data-i18n="falseEyeModel">False Eye</span>
-          </label>
-          <label><span data-i18n="language">Language</span>
-            <select id="language-select">
-              <option value="en">English</option>
-              <option value="ja">日本語</option>
-              <option value="es">Español</option>
-            </select>
-          </label>
-        </div>
-        <div class="group">
+          <button id="btn-settings" data-i18n="settings" data-i18n-title="settingsTitle" title="Game settings">Settings</button>
           <button id="btn-new" data-i18n="newGame" data-i18n-title="newGameTitle" title="New game">New</button>
           <button id="btn-pass" data-i18n="pass" data-i18n-title="passTitle" title="Pass">Pass</button>
           <button id="btn-undo" data-i18n="undo" data-i18n-title="undoTitle" title="Undo">Undo</button>
@@ -165,6 +82,99 @@
           <canvas id="eval-graph-canvas"></canvas>
         </div>
       </section>
+
+      <div id="settings-modal" class="overlay settings-modal" hidden>
+        <div class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+          <div class="settings-header">
+            <h2 id="settings-title" data-i18n="settings">Settings</h2>
+            <button id="btn-close-settings" class="credits-close" title="Close" aria-label="Close">&times;</button>
+          </div>
+          <div class="settings-body">
+            <label><span data-i18n="board">Board</span>
+              <select id="board-size">
+                <option value="9" selected>9 &times; 9</option>
+                <option value="13">13 &times; 13</option>
+                <option value="19">19 &times; 19</option>
+              </select>
+            </label>
+            <label><span data-i18n="opponent">Opponent</span>
+              <select id="ai-level">
+                <option value="dan" data-i18n="dan" selected>KataGo (Dan)</option>
+                <option value="kyu" data-i18n="kyu">KataGo (Kyu)</option>
+                <option value="manual" data-i18n="manual">Manual (2P)</option>
+              </select>
+            </label>
+            <label><span data-i18n="playerSide">Side</span>
+              <select id="player-side">
+                <option value="black" data-i18n="sideBlack" selected>Black (First)</option>
+                <option value="white" data-i18n="sideWhite">White (Second)</option>
+              </select>
+            </label>
+            <label><span data-i18n="pieces">Pieces</span>
+              <select id="piece-style">
+                <option value="clayfoot" data-i18n="pieceClayfoot">Clayfoot Studios</option>
+                <option value="dark-yagami" data-i18n="pieceDarkYagami">Dark Yagami</option>
+                <option value="animal-bag" data-i18n="pieceAnimalBag">Animal Bag</option>
+                <option value="kenney-pets" data-i18n="pieceKenneyPets">Kenney Cube Pets</option>
+                <option value="quirky-animals" data-i18n="pieceQuirkyAnimals" selected>Quirky Animals</option>
+                <option value="stones" data-i18n="pieceStones">Traditional Stones</option>
+              </select>
+            </label>
+            <label><span data-i18n="deadStones">Dead Stones</span>
+              <select id="dead-stone-style">
+                <option value="cube" data-i18n="deadCube" selected>Cube</option>
+                <option value="stone" data-i18n="deadStone">Go Stone</option>
+              </select>
+            </label>
+            <label><span data-i18n="komi">Komi</span>
+              <input id="komi" type="number" step="0.5" min="0" max="20" value="7" />
+            </label>
+            <label class="toggle-control" id="label-hover-eval" title="Realtime ownership preview on mouse hover">
+              <input id="toggle-hover-eval" type="checkbox" checked />
+              <span data-i18n="hoverEval">Hover Eval</span>
+            </label>
+            <label class="toggle-control" id="label-heatmap" data-i18n-title="heatmapTitle" title="Territory heatmap">
+              <input id="toggle-heatmap" type="checkbox" checked />
+              <span data-i18n="heatmap">Territory</span>
+            </label>
+            <label class="toggle-control" id="label-eval-graph" title="Evaluation graph">
+              <input id="toggle-eval-graph" type="checkbox" checked />
+              <span data-i18n="evalGraph">Eval Graph</span>
+            </label>
+            <label class="toggle-control" id="label-eye-highlight" title="Highlight true eyes and two-eye groups">
+              <input id="toggle-eye-highlight" type="checkbox" checked />
+              <span data-i18n="twoEyes">Two Eyes</span>
+            </label>
+            <label id="label-wall-model" title="Model placed between paired true eyes">
+              <span data-i18n="wallModel">Wall</span>
+              <select id="wall-model">
+                <option value="off" data-i18n="off">Off</option>
+                <option value="seaweed" data-i18n="wallSeaweed">Seaweed</option>
+                <option value="fence" data-i18n="wallFence" selected>Fence</option>
+              </select>
+            </label>
+            <label id="label-true-eye-model" title="Model placed on each true eye">
+              <span data-i18n="trueEyeModel">True Eye</span>
+              <select id="true-eye-model">
+                <option value="off" data-i18n="off">Off</option>
+                <option value="cute" data-i18n="trueEyeCute">Cute Flower</option>
+                <option value="trueeye" data-i18n="trueEyeTrue" selected>True Eye Flower</option>
+              </select>
+            </label>
+            <label class="toggle-control" id="label-false-eye-models" title="Weed model on each living false eye">
+              <input id="toggle-false-eye-models" type="checkbox" checked />
+              <span data-i18n="falseEyeModel">False Eye</span>
+            </label>
+            <label><span data-i18n="language">Language</span>
+              <select id="language-select">
+                <option value="en">English</option>
+                <option value="ja">日本語</option>
+                <option value="es">Español</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </div>
 
       <div id="credits-modal" class="overlay credits-modal" hidden>
         <div class="credits-panel" role="dialog" aria-modal="true" aria-labelledby="credits-title">

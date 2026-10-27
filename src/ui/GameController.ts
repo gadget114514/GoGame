@@ -48,6 +48,9 @@ interface Elements {
   save: HTMLButtonElement;
   load: HTMLButtonElement;
   file: HTMLInputElement;
+  settings: HTMLButtonElement;
+  settingsModal: HTMLElement;
+  settingsClose: HTMLButtonElement;
   credits: HTMLButtonElement;
   creditsModal: HTMLElement;
   creditsContent: HTMLElement;
@@ -164,6 +167,9 @@ export class GameController {
       save: requireElement('btn-save'),
       load: requireElement('btn-load'),
       file: requireElement('file-sgf'),
+      settings: requireElement('btn-settings'),
+      settingsModal: requireElement('settings-modal'),
+      settingsClose: requireElement('btn-close-settings'),
       credits: requireElement('btn-credits'),
       creditsModal: requireElement('credits-modal'),
       creditsContent: requireElement('credits-content'),
@@ -372,6 +378,11 @@ export class GameController {
     this.els.save.addEventListener('click', () => this.saveSGF());
     this.els.load.addEventListener('click', () => this.els.file.click());
     this.els.file.addEventListener('change', () => void this.loadSGF());
+    this.els.settings.addEventListener('click', () => this.openSettings());
+    this.els.settingsClose.addEventListener('click', () => this.closeSettings());
+    this.els.settingsModal.addEventListener('click', (event) => {
+      if (event.target === this.els.settingsModal) this.closeSettings();
+    });
     this.els.credits.addEventListener('click', () => this.openCredits());
     this.els.creditsClose.addEventListener('click', () => this.closeCredits());
     this.els.creditsModal.addEventListener('click', (event) => {
@@ -395,10 +406,17 @@ export class GameController {
   private wireKeyboard(): void {
     window.addEventListener('keydown', (e) => {
       const activeTag = (document.activeElement?.tagName || '').toLowerCase();
-      if (e.key === 'Escape' && !this.els.creditsModal.hidden) {
-        e.preventDefault();
-        this.closeCredits();
-        return;
+      if (e.key === 'Escape') {
+        if (!this.els.settingsModal.hidden) {
+          e.preventDefault();
+          this.closeSettings();
+          return;
+        }
+        if (!this.els.creditsModal.hidden) {
+          e.preventDefault();
+          this.closeCredits();
+          return;
+        }
       }
       if (activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea') {
         return;
@@ -482,7 +500,19 @@ export class GameController {
     saveConfig(this.config);
   }
 
+  private openSettings(): void {
+    this.els.creditsModal.hidden = true;
+    this.els.settingsModal.hidden = false;
+    this.els.settingsClose.focus();
+  }
+
+  private closeSettings(): void {
+    this.els.settingsModal.hidden = true;
+    this.els.settings.focus();
+  }
+
   private openCredits(): void {
+    this.els.settingsModal.hidden = true;
     this.els.creditsContent.textContent = thirdpartyText;
     this.els.creditsModal.hidden = false;
     this.els.creditsClose.focus();
