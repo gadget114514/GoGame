@@ -1,5 +1,12 @@
 import { Goban, BLACK, WHITE, type MoveRecord } from '../game/Goban';
-import { DEFAULT_KOMI, formatCoordinate, isBoardSize, type BoardSize } from '../game/BoardSize';
+import {
+  DEFAULT_KOMI,
+  formatCoordinate,
+  isBoardSize,
+  type BoardSize,
+  type ColumnLabels,
+  type RowLabels
+} from '../game/BoardSize';
 import { KataGoEngine, type Evaluation } from '../ai/KataGoEngine';
 import type { AILevel } from '../ai/registry';
 import {
@@ -41,6 +48,8 @@ interface Elements {
   canvas2d: HTMLCanvasElement;
   boardSize: HTMLSelectElement;
   rules: HTMLSelectElement;
+  columnLabels: HTMLSelectElement;
+  rowLabels: HTMLSelectElement;
   cameraProjection: HTMLSelectElement;
   aiLevel: HTMLSelectElement;
   playerSide: HTMLSelectElement;
@@ -54,6 +63,7 @@ interface Elements {
   boardColor: HTMLSelectElement;
   languageSelect: HTMLSelectElement;
   toggleHoverEval: HTMLInputElement;
+  toggleHoverPreview: HTMLInputElement;
   toggleHeatmap: HTMLInputElement;
   heatmapTheme: HTMLSelectElement;
   toggleAnimations: HTMLInputElement;
@@ -132,6 +142,8 @@ export class GameController {
   private goban: Goban;
   private opponent: OpponentMode = 'dan';
   private rules: Rules = 'chinese';
+  private columnLabels: ColumnLabels = 'letters';
+  private rowLabels: RowLabels = 'numbers';
   private cameraProjection: CameraProjection = 'orthographic';
   private playerSide: 'black' | 'white' = 'black';
   private pieceStyle: PieceStyle = 'kenney-pets';
@@ -158,6 +170,7 @@ export class GameController {
   }
 
   private hoverEvalEnabled = true;
+  private hoverPreviewEnabled = true;
   private heatmapEnabled = true;
   private heatmapTheme: HeatmapTheme = 'green-orange';
   private animationsEnabled = true;
@@ -187,6 +200,8 @@ export class GameController {
       canvas2d: requireElement('scene2d'),
       boardSize: requireElement('board-size'),
       rules: requireElement('rules'),
+      columnLabels: requireElement('column-labels'),
+      rowLabels: requireElement('row-labels'),
       cameraProjection: requireElement('camera-projection'),
       aiLevel: requireElement('ai-level'),
       playerSide: requireElement('player-side'),
@@ -206,6 +221,7 @@ export class GameController {
       boardColor: requireElement('board-color'),
       languageSelect: requireElement('language-select'),
       toggleHoverEval: requireElement('toggle-hover-eval'),
+      toggleHoverPreview: requireElement('toggle-hover-preview'),
       toggleHeatmap: requireElement('toggle-heatmap'),
       heatmapTheme: requireElement('heatmap-theme'),
       toggleAnimations: requireElement('toggle-animations'),
@@ -257,6 +273,8 @@ export class GameController {
     this.config = loadConfig();
     this.opponent = this.config.opponent;
     this.rules = this.config.rules;
+    this.columnLabels = this.config.columnLabels;
+    this.rowLabels = this.config.rowLabels;
     this.cameraProjection = this.config.cameraProjection;
     this.playerSide = this.config.playerSide;
     this.pieceStyle = this.config.pieceStyle;
@@ -266,6 +284,7 @@ export class GameController {
     this.boardColor = this.config.boardColor;
     this.view = this.config.view;
     this.hoverEvalEnabled = this.config.hoverEval;
+    this.hoverPreviewEnabled = this.config.hoverPreview;
     this.heatmapEnabled = this.config.heatmap;
     this.heatmapTheme = this.config.heatmapTheme;
     this.animationsEnabled = this.config.animations;
@@ -279,6 +298,8 @@ export class GameController {
 
     this.els.boardSize.value = String(this.config.boardSize);
     this.els.rules.value = this.rules;
+    this.els.columnLabels.value = this.columnLabels;
+    this.els.rowLabels.value = this.rowLabels;
     this.els.cameraProjection.value = this.cameraProjection;
     this.els.komi.value = String(this.config.komi);
     this.els.aiLevel.value = this.opponent;
@@ -289,6 +310,7 @@ export class GameController {
     this.els.boardColor.value = this.boardColor;
     this.els.languageSelect.value = this.config.language;
     this.els.toggleHoverEval.checked = this.hoverEvalEnabled;
+    this.els.toggleHoverPreview.checked = this.hoverPreviewEnabled;
     this.els.toggleHeatmap.checked = this.heatmapEnabled;
     this.els.heatmapTheme.value = this.heatmapTheme;
     this.els.toggleAnimations.checked = this.animationsEnabled;
@@ -327,8 +349,10 @@ export class GameController {
     this.board3d.setPerspective(this.playerSide);
     this.setDeadStoneStyle(this.deadStoneStyle);
     void this.board3d.setPieceStyle(this.pieceStyle);
+    this.board3d.setCoordinateLabels(this.columnLabels, this.rowLabels);
     this.board2d.resize();
     this.board2d.setPerspective(this.playerSide);
+    this.board2d.setCoordinateLabels(this.columnLabels, this.rowLabels);
 
     this.board3d.setOnIntersectionClick((index) => void this.humanPlay(index));
     this.board2d.setOnIntersectionClick((index) => void this.humanPlay(index));
@@ -382,6 +406,20 @@ export class GameController {
       this.rules = this.els.rules.value === 'chinese' ? 'chinese' : 'chinese';
       this.persistConfig();
     });
+    this.els.columnLabels.addEventListener('change', () => {
+      const value = this.els.columnLabels.value;
+      this.columnLabels =
+        value === 'numbers' || value === 'none' ? value : 'letters';
+      this.board3d.setCoordinateLabels(this.columnLabels, this.rowLabels);
+      this.board2d.setCoordinateLabels(this.columnLabels, this.rowLabels);
+      this.persistConfig();
+    });
+    this.els.rowLabels.addEventListener('change', () => {
+      this.rowLabels = this.els.rowLabels.value === 'none' ? 'none' : 'numbers';
+      this.board3d.setCoordinateLabels(this.columnLabels, this.rowLabels);
+      this.board2d.setCoordinateLabels(this.columnLabels, this.rowLabels);
+      this.persistConfig();
+    });
     this.els.playerSide.addEventListener('change', () => {
       const side = (this.els.playerSide.value as 'black' | 'white') || 'black';
       this.setPlayerSide(side);
@@ -428,6 +466,11 @@ export class GameController {
       if (!this.hoverEvalEnabled && this.hoverIndex !== null) {
         this.clearHover();
       }
+    });
+    this.els.toggleHoverPreview.addEventListener('change', () => {
+      this.hoverPreviewEnabled = this.els.toggleHoverPreview.checked;
+      this.persistConfig();
+      this.render();
     });
     this.els.toggleEvalGraph.addEventListener('change', () => {
       this.setEvalGraphEnabled(this.els.toggleEvalGraph.checked);
@@ -648,6 +691,8 @@ export class GameController {
       version: 1,
       boardSize: this.goban.size,
       rules: this.rules,
+      columnLabels: this.columnLabels,
+      rowLabels: this.rowLabels,
       cameraProjection: this.cameraProjection,
       komi: this.goban.komi,
       opponent: this.opponent,
@@ -660,6 +705,7 @@ export class GameController {
       language: getLanguage(),
       view: this.view,
       hoverEval: this.hoverEvalEnabled,
+      hoverPreview: this.hoverPreviewEnabled,
       heatmap: this.heatmapEnabled,
       heatmapTheme: this.heatmapTheme,
       animations: this.animationsEnabled,
@@ -1360,6 +1406,12 @@ export class GameController {
 
   private render(): void {
     const activeEval = this.hoverEvaluation ?? this.evaluation;
+    const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
+    const showHoverPreview =
+      this.hoverPreviewEnabled &&
+      !this.gameOver &&
+      !this.busy &&
+      (this.isManualMode() || this.goban.side === humanColor);
     const state: RenderState = {
       goban: this.goban,
       evaluation: activeEval,
@@ -1371,6 +1423,7 @@ export class GameController {
       animations: this.animationsEnabled,
       showTwoEyeHighlight: this.eyeHighlightEnabled,
       rankThresholds: this.rankThresholds[this.goban.size],
+      showHoverPreview,
       wallModel: this.wallModel,
       fenceModel: this.fenceModel,
       trueEyeModel: this.trueEyeModel,
@@ -1479,6 +1532,7 @@ export class GameController {
     if (this.goban.consecutivePasses >= 2) {
       const wasOver = this.gameOver;
       this.gameOver = true;
+      this.render();
       this.updateStatus();
       if (!wasOver) this.showGameOverDialog();
     }

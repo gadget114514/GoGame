@@ -102,6 +102,19 @@
                 <option value="chinese" data-i18n="rulesChinese" selected>Chinese</option>
               </select>
             </label>
+            <label><span data-i18n="columnLabels">Horizontal Labels</span>
+              <select id="column-labels">
+                <option value="letters" data-i18n="letters" selected>Letters</option>
+                <option value="numbers" data-i18n="numbers">Numbers</option>
+                <option value="none" data-i18n="off">None</option>
+              </select>
+            </label>
+            <label><span data-i18n="rowLabels">Vertical Labels</span>
+              <select id="row-labels">
+                <option value="numbers" data-i18n="numbers" selected>Numbers</option>
+                <option value="none" data-i18n="off">None</option>
+              </select>
+            </label>
             <label><span data-i18n="cameraProjection">Camera</span>
               <select id="camera-projection">
                 <option value="orthographic" data-i18n="cameraOrthographic" selected>Orthographic</option>
@@ -179,6 +192,10 @@
             <label class="toggle-control" id="label-hover-eval" title="Realtime ownership preview on mouse hover">
               <input id="toggle-hover-eval" type="checkbox" checked />
               <span data-i18n="hoverEval">Hover Eval</span>
+            </label>
+            <label class="toggle-control" id="label-hover-preview" title="Show a translucent piece preview while hovering">
+              <input id="toggle-hover-preview" type="checkbox" checked />
+              <span data-i18n="hoverPreview">Hover Preview</span>
             </label>
             <label class="toggle-control" id="label-heatmap" data-i18n-title="heatmapTitle" title="Territory heatmap">
               <input id="toggle-heatmap" type="checkbox" checked />

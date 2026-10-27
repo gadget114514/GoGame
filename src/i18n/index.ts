@@ -5,6 +5,10 @@ export interface Translations {
   rules: string;
   rulesChinese: string;
   rulesTitle: string;
+  columnLabels: string;
+  rowLabels: string;
+  letters: string;
+  numbers: string;
   cameraProjection: string;
   cameraPerspective: string;
   cameraOrthographic: string;
@@ -36,6 +40,7 @@ export interface Translations {
   language: string;
   hoverEval: string;
   hoverEvalTitle: string;
+  hoverPreview: string;
   heatmap: string;
   heatmapTitle: string;
   heatmapColors: string;
@@ -139,6 +144,10 @@ const DICTIONARIES: Record<Language, Translations> = {
     rules: 'Rules',
     rulesChinese: 'Chinese',
     rulesTitle: 'Chinese rules: area scoring counts stones and surrounded territory.',
+    columnLabels: 'Horizontal Labels',
+    rowLabels: 'Vertical Labels',
+    letters: 'Letters',
+    numbers: 'Numbers',
     cameraProjection: 'Camera',
     cameraPerspective: 'Perspective',
     cameraOrthographic: 'Orthographic',
@@ -173,6 +182,7 @@ const DICTIONARIES: Record<Language, Translations> = {
     language: 'Language',
     hoverEval: 'Hover Eval',
     hoverEvalTitle: 'Realtime ownership preview on mouse hover',
+    hoverPreview: 'Hover Preview',
     heatmap: 'Territory',
     heatmapTitle: 'Show predicted territory colors',
     heatmapColors: 'Territory Colors',
@@ -272,6 +282,10 @@ const DICTIONARIES: Record<Language, Translations> = {
     rules: 'ルール',
     rulesChinese: '中国ルール',
     rulesTitle: '中国ルール：石と囲んだ地の合計（面積）で計算します。',
+    columnLabels: '横軸ラベル',
+    rowLabels: '縦軸ラベル',
+    letters: '英字',
+    numbers: '数字',
     cameraProjection: 'カメラ',
     cameraPerspective: 'パースペクティブ',
     cameraOrthographic: 'オルソグラフィック',
@@ -306,6 +320,7 @@ const DICTIONARIES: Record<Language, Translations> = {
     language: '言語',
     hoverEval: 'ホバー予測',
     hoverEvalTitle: 'マウスホバー時のリアルタイム勢力予測',
+    hoverPreview: 'ホバープレビュー',
     heatmap: '地合い',
     heatmapTitle: '予測された地を色付け表示',
     heatmapColors: '地合いの色',
@@ -405,6 +420,10 @@ const DICTIONARIES: Record<Language, Translations> = {
     rules: 'Reglas',
     rulesChinese: 'Chino',
     rulesTitle: 'Reglas chinas: puntuación por área (piedras y territorio rodeado).',
+    columnLabels: 'Etiquetas horizontales',
+    rowLabels: 'Etiquetas verticales',
+    letters: 'Letras',
+    numbers: 'Números',
     cameraProjection: 'Cámara',
     cameraPerspective: 'Perspectiva',
     cameraOrthographic: 'Ortográfica',
@@ -439,6 +458,7 @@ const DICTIONARIES: Record<Language, Translations> = {
     language: 'Idioma',
     hoverEval: 'Eval. al pasar',
     hoverEvalTitle: 'Predicción de territorio en tiempo real al pasar el ratón',
+    hoverPreview: 'Vista previa al pasar',
     heatmap: 'Territorio',
     heatmapTitle: 'Mostrar colores de territorio previsto',
     heatmapColors: 'Colores del territorio',

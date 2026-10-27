@@ -41,6 +41,19 @@ export function neighbors(index: number, size: number): number[] {
 
 export const COORD_LETTERS = 'ABCDEFGHJKLMNOPQRST';
 
+export type ColumnLabels = 'letters' | 'numbers' | 'none';
+export type RowLabels = 'numbers' | 'none';
+
+export function columnLabel(col: number, mode: ColumnLabels): string | null {
+  if (mode === 'none') return null;
+  if (mode === 'letters') return COORD_LETTERS[col] ?? null;
+  return String(col + 1);
+}
+
+export function rowLabel(row: number, mode: RowLabels): string | null {
+  return mode === 'none' ? null : String(row + 1);
+}
+
 /**
  * Formats a 0-indexed board intersection to standard Go coordinate notation (e.g. "Q16", "D4").
  * Standard Go skips the letter 'I'. Row numbering counts from bottom (1) to top (size).

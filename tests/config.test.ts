@@ -35,8 +35,11 @@ describe('game config', () => {
 
     expect(config.boardSize).toBe(9);
     expect(config.rules).toBe('chinese');
+    expect(config.columnLabels).toBe('letters');
+    expect(config.rowLabels).toBe('numbers');
     expect(config.cameraProjection).toBe('orthographic');
     expect(config.komi).toBe(7);
+    expect(config.hoverPreview).toBe(true);
     expect(config.pieceStyle).toBe('kenney-pets');
     expect(config.rankThresholds[19]).toEqual(DEFAULT_RANK_THRESHOLDS[19]);
     expect(config.heatmapTheme).toBe('green-orange');
@@ -58,6 +61,9 @@ describe('game config', () => {
       ...DEFAULT_CONFIG,
       boardSize: 13,
       rules: 'chinese',
+      columnLabels: 'numbers',
+      rowLabels: 'none',
+      hoverPreview: false,
       cameraProjection: 'perspective',
       komi: 7.5,
       pieceStyle: 'animal-bag',
@@ -76,6 +82,9 @@ describe('game config', () => {
     const config = loadConfig();
 
     expect(config.boardSize).toBe(13);
+    expect(config.columnLabels).toBe('numbers');
+    expect(config.rowLabels).toBe('none');
+    expect(config.hoverPreview).toBe(false);
     expect(config.komi).toBe(7.5);
     expect(config.pieceStyle).toBe('animal-bag');
     expect(config.rankThresholds[13]).toEqual([0.8, 0.7, 0.6, 0.5, 0.4]);

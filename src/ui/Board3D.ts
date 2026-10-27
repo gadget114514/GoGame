@@ -28,7 +28,14 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { BLACK, WHITE, type Goban } from '../game/Goban';
-import { starPoints, COORD_LETTERS, type BoardSize } from '../game/BoardSize';
+import {
+  columnLabel,
+  rowLabel,
+  starPoints,
+  type BoardSize,
+  type ColumnLabels,
+  type RowLabels
+} from '../game/BoardSize';
 import type { Evaluation } from '../ai/KataGoEngine';
 import { detectTwoEyes, type EyeAnalysis } from '../game/eyes';
 import { heatColor, type HeatmapTheme } from './heatmap';
@@ -58,6 +65,7 @@ export interface RenderState {
   animations: boolean;
   showTwoEyeHighlight: boolean;
   rankThresholds: RankThresholds;
+  showHoverPreview: boolean;
   wallModel: WallModel;
   fenceModel: FenceModel;
   trueEyeModel: TrueEyeModel;
@@ -239,6 +247,8 @@ export class Board3D {
   private coordTexture: DynamicTexture | null = null;
 
   private boardColor: BoardColor = 'wood';
+  private columnLabels: ColumnLabels = 'letters';
+  private rowLabels: RowLabels = 'numbers';
   private fenceModel: FenceModel = 'dark';
   private currentStyle: PieceStyle = 'kenney-pets';
   private deadStoneStyle: DeadStoneStyle = 'cube';
@@ -280,6 +290,11 @@ export class Board3D {
 
   private hoverMarker: Mesh;
   private hoverHandler: ((index: number | null) => void) | null = null;
+  private hoveredIndex: number | null = null;
+  private hoverPreviewNode: TransformNode | null = null;
+  private hoverPreviewModelKey = '';
+  private hoverPositionKey = '';
+  private hoverPreviewMaterials: Material[] = [];
   private size: BoardSize = 19;
   private clickHandler: ((index: number) => void) | null = null;
   private resizeObserver: ResizeObserver | null = null;
@@ -813,6 +828,9 @@ export class Board3D {
     this.pieces.forEach((piece) => this.disposePiece(piece.root));
     this.pieces.clear();
     this.clearEyeDecorations();
+    this.hoveredIndex = null;
+    this.hoverMarker.isVisible = false;
+    this.clearHoverPreview();
     this.eyeDecorKey = '';
     this.eyeAnalysis = null;
     this.buildBoard();
@@ -968,6 +986,7 @@ export class Board3D {
     this.updateHeat(state);
     this.syncPieces(state);
     if (this.pendingPlacements.size === 0) this.updateEyeDecorations(state);
+    this.updateHoverPreview(state);
   }
 
   private updateHeat(state: RenderState): void {
@@ -1542,36 +1561,34 @@ export class Board3D {
       const pos = center + frac * gridExtent;
 
       // Column labels (top and bottom border)
-      // For Black: Left is 1, Right is n (Top-Left is 1,1; Bottom-Right is n,n)
-      // For White: Left is n, Right is 1 (Screen Top-Left is n,n; Bottom-Right is 1,1)
-      const colNum = isWhite ? n - i : i + 1;
-      const colStr = String(colNum);
       const actualCol = isWhite ? n - 1 - i : i;
+      const colStr = columnLabel(actualCol, this.columnLabels);
       const isColActive = actualCol === lastCol;
 
-      ctx.fillStyle = isColActive ? palette.coordActive : palette.coord;
-      ctx.font = isColActive
-        ? `bold ${Math.max(16, Math.round(28 * (19 / n)))}px "Segoe UI", -apple-system, system-ui, sans-serif`
-        : `700 ${Math.max(14, Math.round(24 * (19 / n)))}px "Segoe UI", -apple-system, system-ui, sans-serif`;
+      if (colStr !== null) {
+        ctx.fillStyle = isColActive ? palette.coordActive : palette.coord;
+        ctx.font = isColActive
+          ? `bold ${Math.max(16, Math.round(28 * (19 / n)))}px "Segoe UI", -apple-system, system-ui, sans-serif`
+          : `700 ${Math.max(14, Math.round(24 * (19 / n)))}px "Segoe UI", -apple-system, system-ui, sans-serif`;
 
-      ctx.fillText(colStr, pos, center - gridExtent / 2 - pad);
-      ctx.fillText(colStr, pos, center + gridExtent / 2 + pad);
+        ctx.fillText(colStr, pos, center - gridExtent / 2 - pad);
+        ctx.fillText(colStr, pos, center + gridExtent / 2 + pad);
+      }
 
       // Row labels (left and right border)
-      // For Black: Top is 1, Bottom is n (Top-Left is 1,1; Bottom-Right is n,n)
-      // For White: Top is n, Bottom is 1 (Screen Top-Left is n,n; Bottom-Right is 1,1)
-      const rowNum = isWhite ? n - i : i + 1;
-      const rowStr = String(rowNum);
       const actualRow = isWhite ? n - 1 - i : i;
+      const rowStr = rowLabel(actualRow, this.rowLabels);
       const isRowActive = actualRow === lastRow;
 
-      ctx.fillStyle = isRowActive ? palette.coordActive : palette.coord;
-      ctx.font = isRowActive
-        ? `bold ${Math.max(16, Math.round(28 * (19 / n)))}px "Segoe UI", -apple-system, system-ui, sans-serif`
-        : `700 ${Math.max(14, Math.round(24 * (19 / n)))}px "Segoe UI", -apple-system, system-ui, sans-serif`;
+      if (rowStr !== null) {
+        ctx.fillStyle = isRowActive ? palette.coordActive : palette.coord;
+        ctx.font = isRowActive
+          ? `bold ${Math.max(16, Math.round(28 * (19 / n)))}px "Segoe UI", -apple-system, system-ui, sans-serif`
+          : `700 ${Math.max(14, Math.round(24 * (19 / n)))}px "Segoe UI", -apple-system, system-ui, sans-serif`;
 
-      ctx.fillText(rowStr, center - gridExtent / 2 - pad, pos);
-      ctx.fillText(rowStr, center + gridExtent / 2 + pad, pos);
+        ctx.fillText(rowStr, center - gridExtent / 2 - pad, pos);
+        ctx.fillText(rowStr, center + gridExtent / 2 + pad, pos);
+      }
     }
     texture.update(false);
   }
@@ -1620,6 +1637,13 @@ export class Board3D {
     if (this.lastState) {
       this.syncPieces(this.lastState);
     }
+  }
+
+  setCoordinateLabels(columns: ColumnLabels, rows: RowLabels): void {
+    if (columns === this.columnLabels && rows === this.rowLabels) return;
+    this.columnLabels = columns;
+    this.rowLabels = rows;
+    this.drawCoordinates(this.lastState?.goban.lastMove ?? null);
   }
 
   setBoardColor(color: BoardColor): void {
@@ -2380,8 +2404,10 @@ export class Board3D {
   }
 
   private setHoverMarker(index: number | null): void {
+    this.hoveredIndex = index;
     if (index === null) {
       this.hoverMarker.isVisible = false;
+      this.updateHoverPreview(this.lastState);
       return;
     }
     const n = this.size;
@@ -2389,6 +2415,99 @@ export class Board3D {
     const col = index % n;
     this.hoverMarker.position.set(this.worldCoordinateX(col), 0.028, this.worldCoordinateZ(row));
     this.hoverMarker.isVisible = true;
+    this.updateHoverPreview(this.lastState);
+  }
+
+  private updateHoverPreview(state: RenderState | null): void {
+    const index = this.hoveredIndex;
+    const evaluation = state?.evaluation;
+    if (!state || !state.showHoverPreview || index === null || !evaluation) {
+      this.clearHoverPreview();
+      return;
+    }
+    if (state.goban.board[index] !== 0 || !state.goban.legal(index)) {
+      this.clearHoverPreview();
+      return;
+    }
+    if (state.goban.size !== this.size) {
+      this.clearHoverPreview();
+      return;
+    }
+    const color = state.goban.side;
+    const { rank, dead } = pieceRank(
+      evaluation.ownership[index],
+      color,
+      false,
+      state.goban.size,
+      state.rankThresholds
+    );
+    if (dead) {
+      this.clearHoverPreview();
+      return;
+    }
+
+    const n = this.size;
+    const row = Math.floor(index / n);
+    const col = index % n;
+    const x = this.worldCoordinateX(col);
+    const z = this.worldCoordinateZ(row);
+    const modelKey = `${color}:${rank}:${this.currentStyle}:${this.perspective}`;
+    const positionKey = `${x}:${z}`;
+
+    if (this.hoverPreviewNode && modelKey === this.hoverPreviewModelKey) {
+      if (positionKey !== this.hoverPositionKey) {
+        this.hoverPreviewNode.position.set(x, 0.03, z);
+        this.hoverPositionKey = positionKey;
+      }
+      return;
+    }
+
+    this.clearHoverPreview();
+    const root = this.createPieceNode(rank, color, index, false);
+    const groups = this.pieceAnimations.get(root.uniqueId);
+    if (groups) {
+      for (const group of groups) group.dispose();
+      this.pieceAnimations.delete(root.uniqueId);
+    }
+    root.position.set(x, 0.03, z);
+    this.applyHoverGhostMaterial(root, color);
+    this.hoverPreviewNode = root;
+    this.hoverPreviewModelKey = modelKey;
+    this.hoverPositionKey = positionKey;
+  }
+
+  private applyHoverGhostMaterial(root: TransformNode, color: number): void {
+    const tint = color === BLACK ? BLACK_MOVE_COLOR : WHITE_MOVE_COLOR;
+    const meshes = root.getChildMeshes(false);
+    if (root instanceof Mesh) meshes.push(root);
+    for (const mesh of meshes) {
+      const material = mesh.material;
+      if (!material) continue;
+      const ghost = material.clone(`${material.name}-hover-${this.effectSeed++}`);
+      if (!ghost) continue;
+      ghost.alpha = 0.4;
+      if (ghost instanceof StandardMaterial) {
+        ghost.emissiveColor = tint.clone();
+        ghost.specularColor = Color3.Black();
+        ghost.backFaceCulling = false;
+      } else if (ghost instanceof PBRMaterial) {
+        ghost.emissiveColor = tint.clone();
+        ghost.backFaceCulling = false;
+      }
+      mesh.material = ghost;
+      this.hoverPreviewMaterials.push(ghost);
+    }
+  }
+
+  private clearHoverPreview(): void {
+    if (this.hoverPreviewNode) {
+      this.disposePiece(this.hoverPreviewNode);
+      this.hoverPreviewNode = null;
+    }
+    for (const material of this.hoverPreviewMaterials) material.dispose();
+    this.hoverPreviewMaterials = [];
+    this.hoverPreviewModelKey = '';
+    this.hoverPositionKey = '';
   }
 
   private pickIntersection(event: PointerEvent): void {
@@ -2413,6 +2532,7 @@ export class Board3D {
 
   dispose(): void {
     window.removeEventListener('resize', this.resize);
+    this.clearHoverPreview();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.pendingPlacements.forEach((pending) => pending.cancel());

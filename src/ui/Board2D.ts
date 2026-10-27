@@ -1,6 +1,12 @@
 import { BLACK, WHITE, type Goban } from '../game/Goban';
 import type { Evaluation } from '../ai/KataGoEngine';
-import { starPoints, COORD_LETTERS } from '../game/BoardSize';
+import {
+  columnLabel,
+  rowLabel,
+  starPoints,
+  type ColumnLabels,
+  type RowLabels
+} from '../game/BoardSize';
 import { heatColor, type HeatmapTheme } from './heatmap';
 import { boardPalette, type BoardColor } from './boardTheme';
 import { pieceRank } from './pieceRank';
@@ -73,6 +79,8 @@ export class Board2D {
   private showHeatmap = true;
   private heatmapTheme: HeatmapTheme = 'green-orange';
   private boardColor: BoardColor = 'wood';
+  private columnLabels: ColumnLabels = 'letters';
+  private rowLabels: RowLabels = 'numbers';
   private showEyeHighlight = false;
   private clickHandler: ((index: number) => void) | null = null;
   private hoverHandler: ((index: number | null) => void) | null = null;
@@ -100,6 +108,13 @@ export class Board2D {
   setPerspective(side: 'black' | 'white'): void {
     if (this.perspective === side) return;
     this.perspective = side;
+    this.render();
+  }
+
+  setCoordinateLabels(columns: ColumnLabels, rows: RowLabels): void {
+    if (columns === this.columnLabels && rows === this.rowLabels) return;
+    this.columnLabels = columns;
+    this.rowLabels = rows;
     this.render();
   }
 
@@ -239,36 +254,34 @@ export class Board2D {
       const posY = this.originY + i * this.cell;
 
       // Column labels (top and bottom border)
-      // For Black: Left is 1, Right is size (Top-Left is 1,1; Bottom-Right is size,size)
-      // For White: Left is size, Right is 1 (Screen Top-Left is size,size; Bottom-Right is 1,1)
-      const colNum = isWhite ? this.size - i : i + 1;
-      const colStr = String(colNum);
       const actualCol = isWhite ? this.size - 1 - i : i;
+      const colStr = columnLabel(actualCol, this.columnLabels);
       const isColActive = actualCol === lastCol;
 
-      ctx.fillStyle = isColActive ? palette.coordActive : palette.coord;
-      ctx.font = isColActive
-        ? `bold ${Math.max(12, this.cell * 0.38)}px "Segoe UI", -apple-system, system-ui, sans-serif`
-        : `700 ${Math.max(11, this.cell * 0.34)}px "Segoe UI", -apple-system, system-ui, sans-serif`;
+      if (colStr !== null) {
+        ctx.fillStyle = isColActive ? palette.coordActive : palette.coord;
+        ctx.font = isColActive
+          ? `bold ${Math.max(12, this.cell * 0.38)}px "Segoe UI", -apple-system, system-ui, sans-serif`
+          : `700 ${Math.max(11, this.cell * 0.34)}px "Segoe UI", -apple-system, system-ui, sans-serif`;
 
-      ctx.fillText(colStr, posX, this.originY - labelPad);
-      ctx.fillText(colStr, posX, this.originY + span + labelPad);
+        ctx.fillText(colStr, posX, this.originY - labelPad);
+        ctx.fillText(colStr, posX, this.originY + span + labelPad);
+      }
 
       // Row labels (left and right border)
-      // For Black: Top is 1, Bottom is size (Top-Left is 1,1; Bottom-Right is size,size)
-      // For White: Top is size, Bottom is 1 (Screen Top-Left is size,size; Bottom-Right is 1,1)
-      const rowNum = isWhite ? this.size - i : i + 1;
-      const rowStr = String(rowNum);
       const actualRow = isWhite ? this.size - 1 - i : i;
+      const rowStr = rowLabel(actualRow, this.rowLabels);
       const isRowActive = actualRow === lastRow;
 
-      ctx.fillStyle = isRowActive ? palette.coordActive : palette.coord;
-      ctx.font = isRowActive
-        ? `bold ${Math.max(12, this.cell * 0.38)}px "Segoe UI", -apple-system, system-ui, sans-serif`
-        : `700 ${Math.max(11, this.cell * 0.34)}px "Segoe UI", -apple-system, system-ui, sans-serif`;
+      if (rowStr !== null) {
+        ctx.fillStyle = isRowActive ? palette.coordActive : palette.coord;
+        ctx.font = isRowActive
+          ? `bold ${Math.max(12, this.cell * 0.38)}px "Segoe UI", -apple-system, system-ui, sans-serif`
+          : `700 ${Math.max(11, this.cell * 0.34)}px "Segoe UI", -apple-system, system-ui, sans-serif`;
 
-      ctx.fillText(rowStr, this.originX - labelPad, posY);
-      ctx.fillText(rowStr, this.originX + span + labelPad, posY);
+        ctx.fillText(rowStr, this.originX - labelPad, posY);
+        ctx.fillText(rowStr, this.originX + span + labelPad, posY);
+      }
     }
 
     // Grid.
