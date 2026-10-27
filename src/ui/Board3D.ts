@@ -278,8 +278,8 @@ export class Board3D {
 
     this.camera = new ArcRotateCamera(
       'camera',
-      -Math.PI / 4,
-      0.82,
+      -Math.PI / 2,
+      Math.PI / 4,
       26,
       Vector3.Zero(),
       this.scene
@@ -486,7 +486,7 @@ export class Board3D {
   setPerspective(side: 'black' | 'white'): void {
     if (this.perspective === side) return;
     this.perspective = side;
-    const targetAlpha = side === 'white' ? (Math.PI * 3) / 4 : -Math.PI / 4;
+    const targetAlpha = side === 'white' ? Math.PI / 2 : -Math.PI / 2;
     this.camera.alpha = targetAlpha;
 
     if (this.coordPlane) {
