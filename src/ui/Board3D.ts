@@ -287,7 +287,7 @@ export class Board3D {
     this.camera.attachControl(canvas, true);
     this.camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
     this.camera.panningSensibility = 250;
-    (this.camera as unknown as { _panningMouseButton: number })._panningMouseButton = 0;
+    (this.camera as unknown as { _panningMouseButton: number })._panningMouseButton = 1;
     this.camera.lowerRadiusLimit = 9;
     this.camera.upperRadiusLimit = 90;
     this.camera.lowerBetaLimit = 0.18;
