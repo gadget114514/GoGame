@@ -157,7 +157,16 @@ const PIECE_TARGET_HEIGHTS: Record<PieceFile, number> = {
 
 const PIECE_SCALE_MULTIPLIERS: Partial<
   Record<PieceStyle, Partial<Record<PieceFile, number>>>
-> = {};
+> = {
+  'kenney-pets': {
+    pawn: 0.8,
+    knight: 0.8,
+    bishop: 0.8,
+    rook: 0.8,
+    queen: 0.8,
+    king: 0.8
+  }
+};
 
 const ANIMAL_SCALE_MULTIPLIERS: Record<string, number> = {
   Muskrat: 0.7,
@@ -1279,7 +1288,7 @@ export class Board3D {
           placements.push({
             x: (ax + bx) / 2,
             z: (az + bz) / 2,
-            angle: Math.atan2(-dz, dx)
+            angle: Math.atan2(dx, dz)
           });
         }
       }
