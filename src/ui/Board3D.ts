@@ -282,12 +282,13 @@ export class Board3D {
       this.scene
     );
     this.camera.attachControl(canvas, true);
+    this.camera.panningSensibility = 250;
+    (this.camera as unknown as { _panningMouseButton: number })._panningMouseButton = 0;
     this.camera.lowerRadiusLimit = 9;
     this.camera.upperRadiusLimit = 90;
     this.camera.lowerBetaLimit = 0.18;
     this.camera.upperBetaLimit = Math.PI / 2 - 0.04;
     this.camera.wheelDeltaPercentage = 0.02;
-    this.camera.panningSensibility = 0;
     this.camera.minZ = 0.1;
 
     const hemi = new HemisphericLight('hemi', new Vector3(0.25, 1, 0.35), this.scene);
