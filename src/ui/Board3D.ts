@@ -157,6 +157,10 @@ const PIECE_SCALE_MULTIPLIERS: Partial<
   Record<PieceStyle, Partial<Record<PieceFile, number>>>
 > = {};
 
+const ANIMAL_SCALE_MULTIPLIERS: Record<string, number> = {
+  Muskrat: 0.7
+};
+
 const PIECE_CENTER_OFFSETS: Partial<
   Record<PieceStyle, Partial<Record<PieceFile, { x?: number; z?: number }>>>
 > = {
@@ -224,6 +228,7 @@ export class Board3D {
   private directional: DirectionalLight;
   private styleContainers = new Map<PieceStyle, Map<PieceFile, AssetContainer>>();
   private styleMetrics = new Map<PieceStyle, Map<PieceFile, PieceMetrics>>();
+  private styleAnimals = new Map<PieceStyle, Map<PieceFile, string>>();
   private styleLoading = new Map<PieceStyle, Promise<void>>();
   private pieces = new Map<number, PieceHandle>();
   private pieceAnimations = new Map<number, AnimationGroup[]>();
@@ -574,6 +579,14 @@ export class Board3D {
           }
         }
       }
+
+      const animalNames = new Map<PieceFile, string>();
+      for (const file of PIECE_FILES) {
+        const container = containers.get(file);
+        const meshName = container?.meshes.find((mesh) => mesh.name)?.name;
+        if (meshName) animalNames.set(file, meshName.split('_LOD')[0]);
+      }
+      this.styleAnimals.set(style, animalNames);
 
       this.styleMetrics.set(style, metrics);
       this.styleContainers.set(style, containers);
@@ -1592,8 +1605,10 @@ export class Board3D {
 
     const metrics = this.styleMetrics.get(this.currentStyle)?.get(file);
     const { min, max } = root.getHierarchyBoundingVectors(true);
+    const animal = this.styleAnimals.get(this.currentStyle)?.get(file);
     const scaleMultiplier =
-      PIECE_SCALE_MULTIPLIERS[this.currentStyle]?.[file] ?? 1;
+      (PIECE_SCALE_MULTIPLIERS[this.currentStyle]?.[file] ?? 1) *
+      (animal ? ANIMAL_SCALE_MULTIPLIERS[animal] ?? 1 : 1);
     const scale =
       (metrics?.scale ?? 1.05 / (max.y - min.y || 1)) * scaleMultiplier;
     root.scaling.setAll(scale);
