@@ -1,5 +1,5 @@
 const GLB_CACHE_VERSION_KEY = 'gogame:glbCacheVersion';
-const GLB_CACHE_VERSION = '1';
+const GLB_CACHE_VERSION = '2';
 
 export async function clearGlbCacheOnce(): Promise<void> {
   if (typeof caches === 'undefined' || typeof localStorage === 'undefined') return;
