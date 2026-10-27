@@ -14,6 +14,7 @@ import {
   StandardMaterial,
   TransformNode,
   Vector3,
+  VertexBuffer,
   type AnimationGroup,
   type AssetContainer,
   type Node
@@ -58,6 +59,13 @@ interface PieceHandle {
   rank: number;
   color: number;
   dead: boolean;
+}
+
+interface PieceMetrics {
+  scale: number;
+  centerX: number;
+  centerZ: number;
+  baseY: number;
 }
 
 interface PendingPlacement {
@@ -142,7 +150,7 @@ export class Board3D {
   private perspective: 'black' | 'white' = 'black';
   private directional: DirectionalLight;
   private styleContainers = new Map<PieceStyle, Map<PieceFile, AssetContainer>>();
-  private styleScales = new Map<PieceStyle, Map<PieceFile, number>>();
+  private styleMetrics = new Map<PieceStyle, Map<PieceFile, PieceMetrics>>();
   private styleLoading = new Map<PieceStyle, Promise<void>>();
   private pieces = new Map<number, PieceHandle>();
   private pieceAnimations = new Map<number, AnimationGroup[]>();
@@ -432,43 +440,139 @@ export class Board3D {
         containers.set(file, container);
       }
 
-      const scales = new Map<PieceFile, number>();
+      const metrics = new Map<PieceFile, PieceMetrics>();
       if (ORIGINAL_COLOR_STYLES.has(style)) {
         for (const file of PIECE_FILES) {
           const container = containers.get(file);
           if (!container) continue;
-          const entries = container.instantiateModelsToScene(undefined, false);
-          const rootNode = entries.rootNodes[0] as TransformNode | undefined;
-          if (rootNode) {
-            const { min, max } = rootNode.getHierarchyBoundingVectors(true);
-            const height = max.y - min.y;
-            if (height > 0) scales.set(file, PIECE_TARGET_HEIGHTS[file] / height);
-          }
-          entries.rootNodes.forEach((node) => node.dispose());
+          const height = this.measureHeight(container);
+          const scale = height > 0 ? PIECE_TARGET_HEIGHTS[file] / height : 1;
+          metrics.set(file, this.computeMetrics(container, scale));
         }
       } else {
         // Compute uniform scale so Queen is ~1.05 high
         const queenContainer = containers.get('queen');
         let setScale = 1.0;
         if (queenContainer) {
-          const qEntries = queenContainer.instantiateModelsToScene(undefined, false);
-          const qRoot = qEntries.rootNodes[0] as TransformNode;
-          const { min, max } = qRoot.getHierarchyBoundingVectors(true);
-          const qHeight = max.y - min.y;
-          if (qHeight > 0) {
-            setScale = 1.05 / qHeight;
-          }
-          qEntries.rootNodes.forEach((n) => n.dispose());
+          const qHeight = this.measureHeight(queenContainer);
+          if (qHeight > 0) setScale = 1.05 / qHeight;
         }
-        for (const file of PIECE_FILES) scales.set(file, setScale);
+        for (const file of PIECE_FILES) {
+          const container = containers.get(file);
+          if (!container) continue;
+          metrics.set(file, this.computeMetrics(container, setScale));
+        }
       }
 
-      this.styleScales.set(style, scales);
+      this.styleMetrics.set(style, metrics);
       this.styleContainers.set(style, containers);
     } catch (error) {
       console.warn(`Failed loading piece style [${style}], using fallback.`, error);
       this.fallback = true;
     }
+  }
+
+  private measureHeight(container: AssetContainer): number {
+    const entries = container.instantiateModelsToScene(undefined, false);
+    const rootNode = entries.rootNodes[0] as TransformNode | undefined;
+    let height = 1;
+    if (rootNode) {
+      const { min, max } = rootNode.getHierarchyBoundingVectors(true);
+      height = max.y - min.y;
+    }
+    entries.animationGroups.forEach((group) => group.dispose());
+    entries.rootNodes.forEach((node) => node.dispose());
+    return height;
+  }
+
+  private computeMetrics(container: AssetContainer, scale: number): PieceMetrics {
+    const entries = container.instantiateModelsToScene(undefined, false);
+    const root = entries.rootNodes[0] as TransformNode | undefined;
+    const metrics: PieceMetrics = { scale, centerX: 0, centerZ: 0, baseY: 0 };
+    if (!root) {
+      entries.animationGroups.forEach((group) => group.dispose());
+      entries.rootNodes.forEach((node) => node.dispose());
+      return metrics;
+    }
+
+    root.scaling.setAll(scale);
+    root.computeWorldMatrix(true);
+    const meshes: Mesh[] = [];
+    for (const child of root.getChildMeshes(false)) {
+      if (child instanceof Mesh && child.getTotalVertices() > 0) meshes.push(child);
+    }
+    if (root instanceof Mesh && root.getTotalVertices() > 0) meshes.push(root);
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    const point = Vector3.Zero();
+
+    for (const mesh of meshes) {
+      mesh.computeWorldMatrix(true);
+      const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+      if (!positions) continue;
+      const matrix = mesh.getWorldMatrix();
+      for (let i = 0; i < positions.length; i += 3) {
+        Vector3.TransformCoordinatesFromFloatsToRef(
+          positions[i],
+          positions[i + 1],
+          positions[i + 2],
+          matrix,
+          point
+        );
+        if (point.x < minX) minX = point.x;
+        if (point.x > maxX) maxX = point.x;
+        if (point.y < minY) minY = point.y;
+        if (point.y > maxY) maxY = point.y;
+        if (point.z < minZ) minZ = point.z;
+        if (point.z > maxZ) maxZ = point.z;
+      }
+    }
+
+    if (Number.isFinite(minY) && Number.isFinite(maxY)) {
+      const threshold = minY + Math.max(0.02, (maxY - minY) * 0.12);
+      let baseMinX = Infinity;
+      let baseMaxX = -Infinity;
+      let baseMinZ = Infinity;
+      let baseMaxZ = -Infinity;
+
+      for (const mesh of meshes) {
+        const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+        if (!positions) continue;
+        const matrix = mesh.getWorldMatrix();
+        for (let i = 0; i < positions.length; i += 3) {
+          Vector3.TransformCoordinatesFromFloatsToRef(
+            positions[i],
+            positions[i + 1],
+            positions[i + 2],
+            matrix,
+            point
+          );
+          if (point.y > threshold) continue;
+          if (point.x < baseMinX) baseMinX = point.x;
+          if (point.x > baseMaxX) baseMaxX = point.x;
+          if (point.z < baseMinZ) baseMinZ = point.z;
+          if (point.z > baseMaxZ) baseMaxZ = point.z;
+        }
+      }
+
+      if (Number.isFinite(baseMinX) && Number.isFinite(baseMaxX)) {
+        metrics.centerX = (baseMinX + baseMaxX) / 2;
+        metrics.centerZ = (baseMinZ + baseMaxZ) / 2;
+      } else {
+        metrics.centerX = (minX + maxX) / 2;
+        metrics.centerZ = (minZ + maxZ) / 2;
+      }
+      metrics.baseY = minY;
+    }
+
+    entries.animationGroups.forEach((group) => group.dispose());
+    entries.rootNodes.forEach((node) => node.dispose());
+    return metrics;
   }
 
   setOnIntersectionClick(handler: (index: number) => void): void {
@@ -1213,15 +1317,19 @@ export class Board3D {
       mesh.isPickable = false;
     }
 
+    const metrics = this.styleMetrics.get(this.currentStyle)?.get(file);
     const { min, max } = root.getHierarchyBoundingVectors(true);
-    const scale =
-      this.styleScales.get(this.currentStyle)?.get(file) ?? 1.05 / (max.y - min.y || 1);
+    const scale = metrics?.scale ?? 1.05 / (max.y - min.y || 1);
     root.scaling.setAll(scale);
 
-    const centered = root.getHierarchyBoundingVectors(true);
-    const centerX = (centered.min.x + centered.max.x) / 2;
-    const centerZ = (centered.min.z + centered.max.z) / 2;
-    root.position.set(-centerX, -centered.min.y, -centerZ);
+    if (metrics) {
+      root.position.set(-metrics.centerX, -metrics.baseY, -metrics.centerZ);
+    } else {
+      const centered = root.getHierarchyBoundingVectors(true);
+      const centerX = (centered.min.x + centered.max.x) / 2;
+      const centerZ = (centered.min.z + centered.max.z) / 2;
+      root.position.set(-centerX, -centered.min.y, -centerZ);
+    }
 
     return wrapper;
   }
