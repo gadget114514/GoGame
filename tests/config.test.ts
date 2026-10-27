@@ -35,6 +35,8 @@ describe('game config', () => {
     expect(config.boardSize).toBe(9);
     expect(config.komi).toBe(7);
     expect(config.pieceStyle).toBe('quirky-animals');
+    expect(config.heatmapTheme).toBe('green-orange');
+    expect(config.animations).toBe(true);
     expect(config.wallModel).toBe('fence');
     expect(config.trueEyeModel).toBe('trueeye');
     expect(config.falseEyeModels).toBe(true);

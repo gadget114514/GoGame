@@ -23,6 +23,12 @@ export interface Translations {
   hoverEvalTitle: string;
   heatmap: string;
   heatmapTitle: string;
+  heatmapColors: string;
+  heatGreenOrange: string;
+  heatOrangeGreen: string;
+  heatBlueOrange: string;
+  heatOrangeBlue: string;
+  animations: string;
   twoEyes: string;
   wallModel: string;
   wallSeaweed: string;
@@ -127,6 +133,12 @@ const DICTIONARIES: Record<Language, Translations> = {
     hoverEvalTitle: 'Realtime ownership preview on mouse hover',
     heatmap: 'Territory',
     heatmapTitle: 'Show predicted territory colors',
+    heatmapColors: 'Territory Colors',
+    heatGreenOrange: 'Green / Orange',
+    heatOrangeGreen: 'Orange / Green',
+    heatBlueOrange: 'Blue / Orange',
+    heatOrangeBlue: 'Orange / Blue',
+    animations: 'Animations',
     twoEyes: 'Two Eyes',
     wallModel: 'Wall',
     wallSeaweed: 'Seaweed',
@@ -226,6 +238,12 @@ const DICTIONARIES: Record<Language, Translations> = {
     hoverEvalTitle: 'マウスホバー時のリアルタイム勢力予測',
     heatmap: '地合い',
     heatmapTitle: '予測された地を色付け表示',
+    heatmapColors: '地合いの色',
+    heatGreenOrange: '緑 / オレンジ',
+    heatOrangeGreen: 'オレンジ / 緑',
+    heatBlueOrange: '青 / オレンジ',
+    heatOrangeBlue: 'オレンジ / 青',
+    animations: 'アニメーション',
     twoEyes: '二眼',
     wallModel: '壁',
     wallSeaweed: '海藻',
@@ -325,6 +343,12 @@ const DICTIONARIES: Record<Language, Translations> = {
     hoverEvalTitle: 'Predicción de territorio en tiempo real al pasar el ratón',
     heatmap: 'Territorio',
     heatmapTitle: 'Mostrar colores de territorio previsto',
+    heatmapColors: 'Colores del territorio',
+    heatGreenOrange: 'Verde / Naranja',
+    heatOrangeGreen: 'Naranja / Verde',
+    heatBlueOrange: 'Azul / Naranja',
+    heatOrangeBlue: 'Naranja / Azul',
+    animations: 'Animaciones',
     twoEyes: 'Dos ojos',
     wallModel: 'Muro',
     wallSeaweed: 'Alga',

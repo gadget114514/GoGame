@@ -21,6 +21,7 @@ import {
 } from '../config';
 import { generateSGF, parseSGF } from '../game/sgf';
 import { EvalGraph, type EvalPoint } from './EvalGraph';
+import { isHeatmapTheme, type HeatmapTheme } from './heatmap';
 import thirdpartyText from '../../thirdparty.txt?raw';
 
 interface Elements {
@@ -34,6 +35,8 @@ interface Elements {
   languageSelect: HTMLSelectElement;
   toggleHoverEval: HTMLInputElement;
   toggleHeatmap: HTMLInputElement;
+  heatmapTheme: HTMLSelectElement;
+  toggleAnimations: HTMLInputElement;
   toggleEvalGraph: HTMLInputElement;
   toggleEyeHighlight: HTMLInputElement;
   wallModel: HTMLSelectElement;
@@ -122,6 +125,8 @@ export class GameController {
 
   private hoverEvalEnabled = true;
   private heatmapEnabled = true;
+  private heatmapTheme: HeatmapTheme = 'green-orange';
+  private animationsEnabled = true;
   private eyeHighlightEnabled = true;
   private wallModel: WallModel = 'fence';
   private trueEyeModel: TrueEyeModel = 'trueeye';
@@ -153,6 +158,8 @@ export class GameController {
       languageSelect: requireElement('language-select'),
       toggleHoverEval: requireElement('toggle-hover-eval'),
       toggleHeatmap: requireElement('toggle-heatmap'),
+      heatmapTheme: requireElement('heatmap-theme'),
+      toggleAnimations: requireElement('toggle-animations'),
       toggleEvalGraph: requireElement('toggle-eval-graph'),
       toggleEyeHighlight: requireElement('toggle-eye-highlight'),
       wallModel: requireElement('wall-model'),
@@ -201,6 +208,8 @@ export class GameController {
     this.view = this.config.view;
     this.hoverEvalEnabled = this.config.hoverEval;
     this.heatmapEnabled = this.config.heatmap;
+    this.heatmapTheme = this.config.heatmapTheme;
+    this.animationsEnabled = this.config.animations;
     this.evalGraphEnabled = this.config.evalGraph;
     this.eyeHighlightEnabled = this.config.twoEyeHighlight;
     this.wallModel = this.config.wallModel;
@@ -217,6 +226,8 @@ export class GameController {
     this.els.languageSelect.value = this.config.language;
     this.els.toggleHoverEval.checked = this.hoverEvalEnabled;
     this.els.toggleHeatmap.checked = this.heatmapEnabled;
+    this.els.heatmapTheme.value = this.heatmapTheme;
+    this.els.toggleAnimations.checked = this.animationsEnabled;
     this.els.toggleEvalGraph.checked = this.evalGraphEnabled;
     this.els.toggleEyeHighlight.checked = this.eyeHighlightEnabled;
     this.els.wallModel.value = this.wallModel;
@@ -328,6 +339,17 @@ export class GameController {
     });
     this.els.toggleHeatmap.addEventListener('change', () => {
       this.heatmapEnabled = this.els.toggleHeatmap.checked;
+      this.persistConfig();
+      this.render();
+    });
+    this.els.heatmapTheme.addEventListener('change', () => {
+      const value = this.els.heatmapTheme.value;
+      this.heatmapTheme = isHeatmapTheme(value) ? value : 'green-orange';
+      this.persistConfig();
+      this.render();
+    });
+    this.els.toggleAnimations.addEventListener('change', () => {
+      this.animationsEnabled = this.els.toggleAnimations.checked;
       this.persistConfig();
       this.render();
     });
@@ -490,6 +512,8 @@ export class GameController {
       view: this.view,
       hoverEval: this.hoverEvalEnabled,
       heatmap: this.heatmapEnabled,
+      heatmapTheme: this.heatmapTheme,
+      animations: this.animationsEnabled,
       evalGraph: this.evalGraphEnabled,
       twoEyeHighlight: this.eyeHighlightEnabled,
       wallModel: this.wallModel,
@@ -1055,6 +1079,8 @@ export class GameController {
       moveWeights: this.moveWeights(),
       opponentColor: this.isManualMode() ? null : this.playerSide === 'black' ? WHITE : BLACK,
       showHeatmap: this.heatmapEnabled,
+      heatmapTheme: this.heatmapTheme,
+      animations: this.animationsEnabled,
       showTwoEyeHighlight: this.eyeHighlightEnabled,
       wallModel: this.wallModel,
       trueEyeModel: this.trueEyeModel,
@@ -1065,7 +1091,8 @@ export class GameController {
       this.goban,
       activeEval,
       this.heatmapEnabled,
-      this.eyeHighlightEnabled
+      this.eyeHighlightEnabled,
+      this.heatmapTheme
     );
   }
 

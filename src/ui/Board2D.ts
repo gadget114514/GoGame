@@ -1,7 +1,7 @@
 import { BLACK, WHITE, type Goban } from '../game/Goban';
 import type { Evaluation } from '../ai/KataGoEngine';
 import { starPoints, COORD_LETTERS } from '../game/BoardSize';
-import { heatColor } from './heatmap';
+import { heatColor, type HeatmapTheme } from './heatmap';
 import { pieceRank } from './pieceRank';
 import { detectTwoEyes } from '../game/eyes';
 
@@ -70,6 +70,7 @@ export class Board2D {
   private goban: Goban | null = null;
   private evaluation: Evaluation | null = null;
   private showHeatmap = true;
+  private heatmapTheme: HeatmapTheme = 'green-orange';
   private showEyeHighlight = false;
   private clickHandler: ((index: number) => void) | null = null;
   private hoverHandler: ((index: number | null) => void) | null = null;
@@ -128,7 +129,8 @@ export class Board2D {
     goban: Goban,
     evaluation: Evaluation | null,
     showHeatmap = true,
-    showEyeHighlight = false
+    showEyeHighlight = false,
+    heatmapTheme: HeatmapTheme = 'green-orange'
   ): void {
     if (goban.moves.length === this.prevMoveCount + 1 && goban.lastMove !== null) {
       this.lastMoveAnimStartTime = performance.now();
@@ -138,6 +140,7 @@ export class Board2D {
     this.evaluation = evaluation;
     this.showHeatmap = showHeatmap;
     this.showEyeHighlight = showEyeHighlight;
+    this.heatmapTheme = heatmapTheme;
     if (goban.size !== this.size) {
       this.size = goban.size;
       this.layout();
@@ -301,7 +304,7 @@ export class Board2D {
       for (let index = 0; index < this.goban.area; index++) {
         const row = Math.floor(index / this.size);
         const col = index % this.size;
-        const [r, g, b, a] = heatColor(ownership[index]);
+        const [r, g, b, a] = heatColor(ownership[index], this.heatmapTheme);
         const { x, y } = this.coordToCanvas(col, row);
         ctx.beginPath();
         ctx.arc(

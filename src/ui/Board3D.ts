@@ -14,6 +14,7 @@ import {
   StandardMaterial,
   TransformNode,
   Vector3,
+  type AnimationGroup,
   type AssetContainer,
   type Node
 } from '@babylonjs/core';
@@ -22,7 +23,7 @@ import { BLACK, WHITE, type Goban } from '../game/Goban';
 import { starPoints, COORD_LETTERS, type BoardSize } from '../game/BoardSize';
 import type { Evaluation } from '../ai/KataGoEngine';
 import { detectTwoEyes, type EyeAnalysis } from '../game/eyes';
-import { heatColor } from './heatmap';
+import { heatColor, type HeatmapTheme } from './heatmap';
 import { pieceRank } from './pieceRank';
 
 export type PieceStyle =
@@ -40,6 +41,8 @@ export interface RenderState {
   moveWeights: Map<number, number>;
   opponentColor: number | null;
   showHeatmap: boolean;
+  heatmapTheme: HeatmapTheme;
+  animations: boolean;
   showTwoEyeHighlight: boolean;
   wallModel: WallModel;
   trueEyeModel: TrueEyeModel;
@@ -142,6 +145,8 @@ export class Board3D {
   private styleScales = new Map<PieceStyle, Map<PieceFile, number>>();
   private styleLoading = new Map<PieceStyle, Promise<void>>();
   private pieces = new Map<number, PieceHandle>();
+  private pieceAnimations = new Map<number, AnimationGroup[]>();
+  private animationsEnabled = true;
   private fallback = false;
   private lastState: RenderState | null = null;
 
@@ -361,7 +366,7 @@ export class Board3D {
     }
     if (this.lastState) {
       if (ORIGINAL_COLOR_STYLES.has(this.currentStyle)) {
-        this.pieces.forEach((piece) => piece.root.dispose());
+        this.pieces.forEach((piece) => this.disposePiece(piece.root));
         this.pieces.clear();
       }
       this.update(this.lastState);
@@ -379,7 +384,7 @@ export class Board3D {
       await this.ensureStyleLoaded(style);
     }
     this.ready = true;
-    this.pieces.forEach((piece) => piece.root.dispose());
+    this.pieces.forEach((piece) => this.disposePiece(piece.root));
     this.pieces.clear();
     if (this.lastState) {
       this.update(this.lastState);
@@ -489,7 +494,7 @@ export class Board3D {
     this.heatTexture = null;
     this.coordPlane = null;
     this.coordTexture = null;
-    this.pieces.forEach((piece) => piece.root.dispose());
+    this.pieces.forEach((piece) => this.disposePiece(piece.root));
     this.pieces.clear();
     this.clearEyeDecorations();
     this.eyeDecorKey = '';
@@ -622,6 +627,11 @@ export class Board3D {
     this.lastState = state;
     if (!this.ready) return;
     if (state.goban.size !== this.size) this.setBoardSize(state.goban.size);
+    if (state.animations !== this.animationsEnabled) {
+      this.animationsEnabled = state.animations;
+      this.pieces.forEach((piece) => this.disposePiece(piece.root));
+      this.pieces.clear();
+    }
     const wantsEyes =
       state.showTwoEyeHighlight ||
       state.wallModel !== 'off' ||
@@ -647,7 +657,7 @@ export class Board3D {
       for (let row = 0; row < n; row++) {
         for (let col = 0; col < n; col++) {
           const value = ownership[row * n + col];
-          const [r, g, b, a] = heatColor(value);
+          const [r, g, b, a] = heatColor(value, state.heatmapTheme);
           const drawCol = isWhite ? n - 1 - col : col;
           const drawRow = isWhite ? n - 1 - row : row;
           const x = (drawCol + 0.5) * cell;
@@ -952,7 +962,7 @@ export class Board3D {
           existing.dead !== dead
         ) {
           const wasExisting = !!existing;
-          existing?.root.dispose();
+          if (existing) this.disposePiece(existing.root);
           const row = Math.floor(index / n);
           const col = index % n;
           const targetX = this.worldCoordinateX(col);
@@ -979,7 +989,7 @@ export class Board3D {
         }
       } else if (existing) {
         if (isNewMove) this.explodePiece(existing);
-        else existing.root.dispose();
+        else this.disposePiece(existing.root);
         this.pieces.delete(index);
       }
     }
@@ -1133,7 +1143,7 @@ export class Board3D {
   setDeadStoneStyle(style: DeadStoneStyle): void {
     if (this.deadStoneStyle === style) return;
     this.deadStoneStyle = style;
-    this.pieces.forEach((piece) => piece.root.dispose());
+    this.pieces.forEach((piece) => this.disposePiece(piece.root));
     this.pieces.clear();
     if (this.lastState) {
       this.syncPieces(this.lastState);
@@ -1175,6 +1185,19 @@ export class Board3D {
     root.parent = wrapper;
     root.name = `piece-root-${index}`;
 
+    if (this.animationsEnabled && entries.animationGroups.length > 0) {
+      const idle =
+        entries.animationGroups.find((group) => /idle/i.test(group.name)) ??
+        entries.animationGroups[0];
+      for (const group of entries.animationGroups) {
+        if (group !== idle) group.dispose();
+      }
+      idle.start(true);
+      this.pieceAnimations.set(wrapper.uniqueId, [idle]);
+    } else {
+      entries.animationGroups.forEach((group) => group.dispose());
+    }
+
     const meshes = root.getChildMeshes(false);
     if (root instanceof Mesh) meshes.push(root);
     const originalColors = ORIGINAL_COLOR_STYLES.has(this.currentStyle);
@@ -1194,11 +1217,22 @@ export class Board3D {
     const scale =
       this.styleScales.get(this.currentStyle)?.get(file) ?? 1.05 / (max.y - min.y || 1);
     root.scaling.setAll(scale);
-    const centerX = (min.x + max.x) / 2;
-    const centerZ = (min.z + max.z) / 2;
-    root.position.set(-centerX * scale, -min.y * scale, -centerZ * scale);
+
+    const centered = root.getHierarchyBoundingVectors(true);
+    const centerX = (centered.min.x + centered.max.x) / 2;
+    const centerZ = (centered.min.z + centered.max.z) / 2;
+    root.position.set(-centerX, -centered.min.y, -centerZ);
 
     return wrapper;
+  }
+
+  private disposePiece(root: TransformNode): void {
+    const groups = this.pieceAnimations.get(root.uniqueId);
+    if (groups) {
+      for (const group of groups) group.dispose();
+      this.pieceAnimations.delete(root.uniqueId);
+    }
+    root.dispose();
   }
 
   private buildStone(wrapper: TransformNode, color: number): void {
@@ -1448,7 +1482,8 @@ export class Board3D {
     const { rank, dead } = this.rankFor(index, color, state);
     const root = this.createPieceNode(rank, color, index, dead);
     root.position.set(targetX, targetY, targetZ);
-    this.pieces.get(index)?.root.dispose();
+    const replaced = this.pieces.get(index);
+    if (replaced) this.disposePiece(replaced.root);
     this.pieces.set(index, { root, rank, color, dead });
     this.animatePieceEntrance(index, root, dramatic);
 
@@ -1505,7 +1540,7 @@ export class Board3D {
     this.spawnBurst(position.add(new Vector3(0, 0.24, 0)), color, 95, 4.6);
     this.spawnShards(position, piece.color);
     this.spawnShockwave(position, color);
-    piece.root.dispose();
+    this.disposePiece(piece.root);
   }
 
   private spawnBurst(

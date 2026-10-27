@@ -60,11 +60,11 @@ const QUIRKY = {
   source: path.join(ROOT, '3d', 'quirky-series-free-animals-pack', 'source', 'FREE Animals.fbx'),
   animals: {
     pawn: 'Sparrow',
-    knight: 'Pudu',
+    knight: 'Herring',
     bishop: 'Colobus',
     rook: 'Muskrat',
-    queen: 'Inkfish',
-    king: 'Taipan'
+    queen: 'Gecko',
+    king: 'Pudu'
   }
 };
 
@@ -106,15 +106,34 @@ function dropAnimations(root) {
   for (const animation of root.listAnimations()) animation.dispose();
 }
 
+function keepIdleAnimation(root, keep) {
+  const animations = root.listAnimations();
+  if (!animations.length) return;
+  const idle = animations.find((animation) => /idle/i.test(animation.getName() ?? '')) ?? animations[0];
+  for (const animation of animations) {
+    if (animation !== idle) animation.dispose();
+  }
+  for (const channel of idle.listChannels()) {
+    const target = channel.getTargetNode();
+    if (!target || !keep.has(target)) channel.dispose();
+  }
+  if (idle.listChannels().length === 0) idle.dispose();
+  else idle.setName('Idle');
+}
+
 function renameRootNode(root, name) {
   const scene = root.getDefaultScene();
   const top = scene?.listChildren()[0];
   if (top) top.setName(name);
 }
 
-async function finalize(doc, destination, piece) {
+async function finalize(doc, destination, piece, options = {}) {
   const root = doc.getRoot();
-  dropAnimations(root);
+  if (options.keepIdleAnimation && options.keep) {
+    keepIdleAnimation(root, options.keep);
+  } else {
+    dropAnimations(root);
+  }
   isolateSingleRoot(root);
   renameRootNode(root, piece);
   await prune()(doc);
@@ -241,7 +260,10 @@ async function buildQuirky() {
       keepWithAncestors(meshNode, keep);
       keepRigForMesh(meshNode, keep);
       removeUnusedNodes(root, keep);
-      await finalize(doc, path.join(QUIRKY.out, `${piece}.glb`), piece);
+      await finalize(doc, path.join(QUIRKY.out, `${piece}.glb`), piece, {
+        keepIdleAnimation: true,
+        keep
+      });
     }
   } finally {
     rmSync(tempDir, { recursive: true, force: true });

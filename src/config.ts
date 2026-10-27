@@ -1,5 +1,6 @@
 import { DEFAULT_KOMI, isBoardSize, type BoardSize } from './game/BoardSize';
 import { detectInitialLanguage, type Language } from './i18n';
+import { isHeatmapTheme, type HeatmapTheme } from './ui/heatmap';
 import type {
   DeadStoneStyle,
   PieceStyle,
@@ -22,6 +23,8 @@ export interface GameConfig {
   view: ViewMode;
   hoverEval: boolean;
   heatmap: boolean;
+  heatmapTheme: HeatmapTheme;
+  animations: boolean;
   evalGraph: boolean;
   twoEyeHighlight: boolean;
   wallModel: WallModel;
@@ -44,6 +47,8 @@ export const DEFAULT_CONFIG: GameConfig = {
   view: '3d',
   hoverEval: true,
   heatmap: true,
+  heatmapTheme: 'green-orange',
+  animations: true,
   evalGraph: true,
   twoEyeHighlight: true,
   wallModel: 'fence',
@@ -120,6 +125,8 @@ function sanitize(raw: unknown): GameConfig {
 
   config.hoverEval = bool(value.hoverEval, config.hoverEval);
   config.heatmap = bool(value.heatmap, config.heatmap);
+  if (isHeatmapTheme(value.heatmapTheme)) config.heatmapTheme = value.heatmapTheme;
+  config.animations = bool(value.animations, config.animations);
   config.evalGraph = bool(value.evalGraph, config.evalGraph);
   config.twoEyeHighlight = bool(value.twoEyeHighlight, config.twoEyeHighlight);
   config.falseEyeModels = bool(value.falseEyeModels, config.falseEyeModels);
@@ -167,6 +174,10 @@ function readLegacy(): Partial<GameConfig> {
   if (hoverEval !== null) legacy.hoverEval = hoverEval !== 'false';
   const heatmap = storage.getItem('gogame:heatmap');
   if (heatmap !== null) legacy.heatmap = heatmap !== 'false';
+  const heatmapTheme = storage.getItem('gogame:heatmapTheme');
+  if (heatmapTheme && isHeatmapTheme(heatmapTheme)) legacy.heatmapTheme = heatmapTheme;
+  const animations = storage.getItem('gogame:animations');
+  if (animations !== null) legacy.animations = animations !== 'false';
   const evalGraph = storage.getItem('gogame:evalGraph');
   if (evalGraph !== null) legacy.evalGraph = evalGraph !== 'false';
   const eyeHighlight = storage.getItem('gogame:eyeHighlight');
