@@ -1197,7 +1197,6 @@ export class Board3D {
       if ((color !== BLACK && color !== WHITE) || seenGroups[index]) continue;
       const group = goban.groupAt(index);
       for (const stone of group.stones) seenGroups[stone] = 1;
-      if (group.liberties.size !== 2) continue;
 
       for (const liberty of group.liberties) {
         const row = Math.floor(liberty / n);
