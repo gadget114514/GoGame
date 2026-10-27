@@ -373,7 +373,7 @@ export class Board3D {
     this.lastMoveGlowMaterial.emissiveColor = BLACK_MOVE_COLOR;
     this.lastMoveGlowMaterial.specularColor = Color3.Black();
     this.lastMoveGlowMaterial.disableLighting = true;
-    this.lastMoveGlowMaterial.alpha = 0.24;
+    this.lastMoveGlowMaterial.alpha = 0.18;
     this.lastMoveGlowMaterial.backFaceCulling = false;
 
     const ring = MeshBuilder.CreateTorus(
@@ -388,7 +388,7 @@ export class Board3D {
 
     const glow = MeshBuilder.CreateDisc(
       'last-move-glow',
-      { radius: 0.64, tessellation: 48 },
+      { radius: 0.62, tessellation: 48 },
       this.scene
     );
     glow.rotation.x = -Math.PI / 2;
@@ -421,7 +421,7 @@ export class Board3D {
       mainTextureFixedSize: 512,
       blurKernelSize: 48
     });
-    this.glowLayer.intensity = 0.5;
+    this.glowLayer.intensity = 0.35;
     this.glowLayer.addIncludedOnlyMesh(this.lastMoveRing);
     this.glowLayer.addIncludedOnlyMesh(this.lastMoveGlow);
     this.glowLayer.addIncludedOnlyMesh(this.lastMoveBeacon);
@@ -1390,7 +1390,7 @@ export class Board3D {
     const isOpponentMove =
       state.opponentColor !== null && state.goban.board[last] === state.opponentColor;
     this.lastMoveEmphasis = isOpponentMove ? 1.3 : 1;
-    this.glowLayer.intensity = isOpponentMove ? 1.0 : 0.5;
+    this.glowLayer.intensity = isOpponentMove ? 0.75 : 0.35;
 
     this.lastMoveMaterial.emissiveColor.copyFrom(color);
     this.lastMoveGlowMaterial.emissiveColor.copyFrom(color);
