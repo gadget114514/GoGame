@@ -60,10 +60,10 @@ const QUIRKY = {
   source: path.join(ROOT, '3d', 'quirky-series-free-animals-pack', 'source', 'FREE Animals.fbx'),
   animals: {
     pawn: 'Sparrow',
-    knight: 'Muskrat',
-    bishop: 'Pudu',
-    rook: 'Colobus',
-    queen: 'Taipan',
+    knight: 'Taipan',
+    bishop: 'Muskrat',
+    rook: 'Pudu',
+    queen: 'Colobus',
     king: 'Inkfish'
   }
 };
