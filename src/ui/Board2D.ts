@@ -384,7 +384,7 @@ export class Board2D {
       const col = index % this.size;
       const { x, y } = this.coordToCanvas(col, row);
       const ownership = this.evaluation?.ownership[index] ?? 0;
-      const { dead } = pieceRank(ownership, color, false);
+      const { dead } = pieceRank(ownership, color, false, this.size as 9 | 13 | 19);
       if (dead) {
         const size = radius * 1.1;
         ctx.fillStyle = color === BLACK ? 'rgba(10,10,14,0.8)' : 'rgba(245,240,230,0.85)';

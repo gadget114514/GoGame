@@ -1305,7 +1305,7 @@ export class Board3D {
 
   private rankFor(index: number, color: number, state: RenderState): { rank: number; dead: boolean } {
     const ownership = state.evaluation?.ownership[index] ?? 0;
-    return pieceRank(ownership, color, index === state.goban.lastMove);
+    return pieceRank(ownership, color, index === state.goban.lastMove, state.goban.size);
   }
 
   private countGroupLiberties(goban: Goban): Map<number, number> {

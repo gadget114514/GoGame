@@ -210,6 +210,15 @@ canvas[hidden],
   min-height: 20px;
 }
 
+#rank-legend.legend-text-only li {
+  grid-template-columns: 1fr auto;
+}
+
+#rank-legend.legend-text-only .glyph,
+#rank-legend.legend-text-only .dead .cube {
+  display: none;
+}
+
 #rank-legend .glyph {
   color: var(--text);
   font-family: "Segoe UI Symbol", "DejaVu Sans", sans-serif;

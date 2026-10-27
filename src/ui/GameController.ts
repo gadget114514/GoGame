@@ -23,6 +23,7 @@ import {
 } from '../config';
 import { generateSGF, parseSGF } from '../game/sgf';
 import { EvalGraph, type EvalPoint } from './EvalGraph';
+import { rankLegendRanges } from './pieceRank';
 import { isHeatmapTheme, type HeatmapTheme } from './heatmap';
 import { isBoardColor, type BoardColor } from './boardTheme';
 import { isFenceModel, type FenceModel } from './fenceModels';
@@ -280,6 +281,7 @@ export class GameController {
     this.setEvalGraphEnabled(this.evalGraphEnabled);
 
     this.board3d.setBoardSize(size);
+    this.updateRankLegend();
     this.board3d.setPerspective(this.playerSide);
     this.setDeadStoneStyle(this.deadStoneStyle);
     void this.board3d.setPieceStyle(this.pieceStyle);
@@ -292,6 +294,7 @@ export class GameController {
     this.board3d.setOnIntersectionHover((index) => this.onHoverIntersection(index));
     this.board2d.setOnIntersectionHover((index) => this.onHoverIntersection(index));
 
+    this.updateRankLegend();
     this.resetHistory();
     this.wireControls();
     this.wireKeyboard();
@@ -300,10 +303,7 @@ export class GameController {
     this.render();
     this.updateStatus();
 
-    const legend = document.getElementById('rank-legend');
-    if (legend && this.pieceStyle === 'stones') {
-      legend.style.display = 'none';
-    }
+    this.applyLegendStyle();
   }
 
   async start(): Promise<void> {
@@ -341,10 +341,7 @@ export class GameController {
       this.pieceStyle = (this.els.pieceStyle.value as PieceStyle) || 'quirky-animals';
       this.applyStylePreset(this.pieceStyle);
       void this.board3d.setPieceStyle(this.pieceStyle);
-      const legend = document.getElementById('rank-legend');
-      if (legend) {
-        legend.style.display = this.pieceStyle === 'stones' ? 'none' : '';
-      }
+      this.applyLegendStyle();
       this.persistConfig();
     });
     this.els.deadStoneStyle.addEventListener('change', () => {
@@ -617,8 +614,25 @@ export class GameController {
     this.els.credits.focus();
   }
 
+  private applyLegendStyle(): void {
+    const legend = document.getElementById('rank-legend');
+    if (!legend) return;
+    const isChess = this.pieceStyle === 'clayfoot' || this.pieceStyle === 'dark-yagami';
+    legend.classList.toggle('legend-text-only', !isChess);
+    legend.style.display =
+      this.view === '3d' && this.pieceStyle !== 'stones' ? '' : 'none';
+  }
+
   private updateViewButtonText(): void {
     this.els.view.textContent = this.view === '3d' ? t('toggleView2D') : t('toggleView3D');
+  }
+
+  private updateRankLegend(): void {
+    const ranges = rankLegendRanges(this.goban.size);
+    for (const [key, value] of Object.entries(ranges)) {
+      const element = document.getElementById(`range-${key}`);
+      if (element) element.textContent = value;
+    }
   }
 
   private readBoardSize(): BoardSize {
@@ -677,6 +691,7 @@ export class GameController {
     this.evaluation = null;
     this.gameOver = false;
     this.board3d.setBoardSize(size);
+    this.updateRankLegend();
     this.board3d.setPerspective(this.playerSide);
     this.board2d.resize();
     this.board2d.setPerspective(this.playerSide);
@@ -703,10 +718,7 @@ export class GameController {
     this.els.canvas3d.style.display = show3d ? 'block' : 'none';
     this.els.canvas2d.style.display = show3d ? 'none' : 'block';
     this.updateViewButtonText();
-    const legend = document.getElementById('rank-legend');
-    if (legend) {
-      legend.style.display = !show3d || this.pieceStyle === 'stones' ? 'none' : '';
-    }
+    this.applyLegendStyle();
     if (show3d) {
       this.board3d.resize();
     } else {
@@ -1332,6 +1344,7 @@ export class GameController {
       this.els.komi.value = String(parsed.komi);
       this.goban = new Goban(size, parsed.komi);
       this.board3d.setBoardSize(size);
+      this.updateRankLegend();
       this.board3d.setPerspective('black');
       this.board2d.resize();
       this.board2d.setPerspective('black');
