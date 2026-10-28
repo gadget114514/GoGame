@@ -90,6 +90,7 @@ export class Board2D {
   private hoverIndex: number | null = null;
   private reviewPlayed: number | null = null;
   private reviewCorrect: number | null = null;
+  private reviewAnswer: number | null = null;
   private quizMarkers: BoardMarker[] = [];
   private perspective: 'black' | 'white' = 'black';
 
@@ -143,10 +144,21 @@ export class Board2D {
     this.hoverHandler = handler;
   }
 
-  setReviewMarkers(played: number | null, correct: number | null): void {
-    if (this.reviewPlayed === played && this.reviewCorrect === correct) return;
+  setReviewMarkers(
+    played: number | null,
+    correct: number | null,
+    answer: number | null = null
+  ): void {
+    if (
+      this.reviewPlayed === played &&
+      this.reviewCorrect === correct &&
+      this.reviewAnswer === answer
+    ) {
+      return;
+    }
     this.reviewPlayed = played;
     this.reviewCorrect = correct;
+    this.reviewAnswer = answer;
     this.render();
   }
 
@@ -523,12 +535,12 @@ export class Board2D {
       ctx.fill();
     }
 
-    // Review markers: the move that was played (red) and the best move (green).
+    // Review markers: played move (red), clicked answer (yellow), best move (green).
     if (this.reviewPlayed !== null) {
       const pRow = Math.floor(this.reviewPlayed / this.size);
       const pCol = this.reviewPlayed % this.size;
       const { x, y } = this.coordToCanvas(pCol, pRow);
-      const r = radius * 0.95;
+      const r = radius * 1.0;
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.strokeStyle = '#ff5f45';
@@ -542,11 +554,36 @@ export class Board2D {
       ctx.stroke();
     }
 
+    if (this.reviewAnswer !== null) {
+      const aRow = Math.floor(this.reviewAnswer / this.size);
+      const aCol = this.reviewAnswer % this.size;
+      const { x, y } = this.coordToCanvas(aCol, aRow);
+      const r = radius * 0.9;
+      ctx.save();
+      ctx.shadowColor = '#ffd166';
+      ctx.shadowBlur = this.cell * 0.45;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ffd166';
+      ctx.lineWidth = Math.max(2, this.cell * 0.06);
+      ctx.setLineDash([
+        Math.max(3, this.cell * 0.12),
+        Math.max(2, this.cell * 0.08)
+      ]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(2, radius * 0.15), 0, Math.PI * 2);
+      ctx.fillStyle = '#ffd166';
+      ctx.fill();
+      ctx.restore();
+    }
+
     if (this.reviewCorrect !== null) {
       const cRow = Math.floor(this.reviewCorrect / this.size);
       const cCol = this.reviewCorrect % this.size;
       const { x, y } = this.coordToCanvas(cCol, cRow);
-      const r = radius * 0.95;
+      const r = radius * 0.74;
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.strokeStyle = '#35d07f';

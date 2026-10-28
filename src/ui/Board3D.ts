@@ -295,6 +295,7 @@ export class Board3D {
   private hoverMarker: Mesh;
   private reviewPlayedMarker: Mesh;
   private reviewCorrectMarker: Mesh;
+  private reviewAnswerMarker: Mesh;
   private quizMarkerMeshes: Mesh[] = [];
   private quizMarkerMaterials: StandardMaterial[] = [];
   private quizMarkerEmphasis: boolean[] = [];
@@ -500,7 +501,7 @@ export class Board3D {
 
     const reviewPlayedRing = MeshBuilder.CreateTorus(
       'review-played-ring',
-      { diameter: 1.08, thickness: 0.075, tessellation: 40 },
+      { diameter: 1.26, thickness: 0.055, tessellation: 40 },
       this.scene
     );
     reviewPlayedRing.material = reviewPlayedMat;
@@ -518,7 +519,7 @@ export class Board3D {
 
     const reviewCorrectRing = MeshBuilder.CreateTorus(
       'review-correct-ring',
-      { diameter: 1.08, thickness: 0.075, tessellation: 40 },
+      { diameter: 0.98, thickness: 0.085, tessellation: 40 },
       this.scene
     );
     reviewCorrectRing.material = reviewCorrectMat;
@@ -526,8 +527,27 @@ export class Board3D {
     reviewCorrectRing.isVisible = false;
     this.reviewCorrectMarker = reviewCorrectRing;
 
+    const reviewAnswerMat = new StandardMaterial('review-answer-mat', this.scene);
+    reviewAnswerMat.diffuseColor = Color3.Black();
+    reviewAnswerMat.emissiveColor = new Color3(1.0, 0.82, 0.4);
+    reviewAnswerMat.specularColor = Color3.Black();
+    reviewAnswerMat.disableLighting = true;
+    reviewAnswerMat.alpha = 0.95;
+    reviewAnswerMat.backFaceCulling = false;
+
+    const reviewAnswerRing = MeshBuilder.CreateTorus(
+      'review-answer-ring',
+      { diameter: 1.12, thickness: 0.06, tessellation: 40 },
+      this.scene
+    );
+    reviewAnswerRing.material = reviewAnswerMat;
+    reviewAnswerRing.isPickable = false;
+    reviewAnswerRing.isVisible = false;
+    this.reviewAnswerMarker = reviewAnswerRing;
+
     this.glowLayer.addIncludedOnlyMesh(reviewPlayedRing);
     this.glowLayer.addIncludedOnlyMesh(reviewCorrectRing);
+    this.glowLayer.addIncludedOnlyMesh(reviewAnswerRing);
 
     for (let i = 0; i < QUIZ_MARKER_LIMIT; i++) {
       const material = new StandardMaterial(`quiz-marker-material-${i}`, this.scene);
@@ -891,9 +911,14 @@ export class Board3D {
     this.hoverHandler = handler;
   }
 
-  setReviewMarkers(played: number | null, correct: number | null): void {
+  setReviewMarkers(
+    played: number | null,
+    correct: number | null,
+    answer: number | null = null
+  ): void {
     this.positionReviewMarker(this.reviewPlayedMarker, played);
     this.positionReviewMarker(this.reviewCorrectMarker, correct);
+    this.positionReviewMarker(this.reviewAnswerMarker, answer);
   }
 
   private positionReviewMarker(marker: Mesh, index: number | null): void {
@@ -970,6 +995,7 @@ export class Board3D {
     this.hoverMarker.isVisible = false;
     this.reviewPlayedMarker.isVisible = false;
     this.reviewCorrectMarker.isVisible = false;
+    this.reviewAnswerMarker.isVisible = false;
     for (let i = 0; i < this.quizMarkerMeshes.length; i++) {
       this.quizMarkerMeshes[i].isVisible = false;
       this.quizMarkerEmphasis[i] = false;

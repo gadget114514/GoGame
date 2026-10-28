@@ -875,8 +875,8 @@ export class GameController {
     this.reviewReady = false;
     this.reviewAwaitingAnswer = false;
     this.els.reviewModal.hidden = true;
-    this.board3d.setReviewMarkers(null, null);
-    this.board2d.setReviewMarkers(null, null);
+    this.board3d.setReviewMarkers(null, null, null);
+    this.board2d.setReviewMarkers(null, null, null);
     this.els.quiz.disabled = false;
     this.els.answer.disabled = false;
     if (this.reviewStyleApplied) this.applyReviewStyle(false);
@@ -1003,8 +1003,8 @@ export class GameController {
     this.evalGraph.setCurrentStep(beforeStep);
     this.render();
     this.updateStatus();
-    this.board3d.setReviewMarkers(problem.playedMove, null);
-    this.board2d.setReviewMarkers(problem.playedMove, null);
+    this.board3d.setReviewMarkers(problem.playedMove, null, null);
+    this.board2d.setReviewMarkers(problem.playedMove, null, null);
 
     this.updateReviewText();
     this.els.reviewFeedback.textContent = t('reviewPick');
@@ -1129,8 +1129,8 @@ export class GameController {
 
       this.reviewAwaitingAnswer = false;
       this.reviewReady = false;
-      this.board3d.setReviewMarkers(problem.playedMove, problem.bestMove);
-      this.board2d.setReviewMarkers(problem.playedMove, problem.bestMove);
+      this.board3d.setReviewMarkers(problem.playedMove, problem.bestMove, index);
+      this.board2d.setReviewMarkers(problem.playedMove, problem.bestMove, index);
       this.els.reviewFeedback.className = `review-feedback ${
         correct ? 'correct' : 'incorrect'
       }`;
