@@ -266,6 +266,70 @@ canvas[hidden],
   background: radial-gradient(circle at 35% 30%, #f5f0e6, #b7a48f 72%);
 }
 
+.quiz-legend {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  z-index: 15;
+  transform: translateY(-50%);
+  width: 170px;
+  padding: 10px 12px 11px;
+  background: rgba(24, 17, 12, 0.88);
+  border: 1px solid #5a4130;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+.quiz-legend h3 {
+  margin: 0 0 7px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.quiz-legend ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quiz-legend li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.quiz-legend .dot {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+}
+
+.quiz-legend .dot.best {
+  background: #3b82f6;
+  box-shadow: 0 0 10px #3b82f6, 0 0 20px rgba(59, 130, 246, 0.55);
+}
+
+.quiz-legend .dot.worst {
+  background: #ef4444;
+  box-shadow: 0 0 10px #ef4444, 0 0 20px rgba(239, 68, 68, 0.55);
+}
+
+.quiz-legend .dot.random {
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+}
+
 .overlay {
   position: absolute;
   inset: 0;
@@ -984,5 +1048,13 @@ canvas[hidden],
   }
   #rank-legend .glyph {
     font-size: 17px;
+  }
+  .quiz-legend {
+    top: auto;
+    right: 8px;
+    bottom: 8px;
+    transform: none;
+    width: 150px;
+    padding: 8px 10px;
   }
 }

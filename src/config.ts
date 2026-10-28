@@ -27,11 +27,13 @@ import type {
 export type OpponentMode = 'dan' | 'kyu' | 'manual';
 export type Rules = 'chinese';
 export type ViewMode = '3d' | '2d';
+export type CoordinateSystem = 'screen' | 'standard';
 
 export interface GameConfig {
   version: 1;
   boardSize: BoardSize;
   rules: Rules;
+  coordinateSystem: CoordinateSystem;
   columnLabels: ColumnLabels;
   rowLabels: RowLabels;
   komi: number;
@@ -65,7 +67,8 @@ export const DEFAULT_CONFIG: GameConfig = {
   version: 1,
   boardSize: 9,
   rules: 'chinese',
-  columnLabels: 'letters',
+  coordinateSystem: 'screen',
+  columnLabels: 'numbers',
   rowLabels: 'numbers',
   komi: DEFAULT_KOMI[9],
   opponent: 'dan',
@@ -111,8 +114,7 @@ const TRUE_EYE_MODELS = new Set<TrueEyeModel>(['off', 'cute', 'trueeye']);
 const LANGUAGES = new Set<Language>(['en', 'ja', 'es']);
 const OPPONENTS = new Set<OpponentMode>(['dan', 'kyu', 'manual']);
 const RULES = new Set<Rules>(['chinese']);
-const COLUMN_LABELS = new Set<ColumnLabels>(['letters', 'numbers', 'none']);
-const ROW_LABELS = new Set<RowLabels>(['numbers', 'none']);
+const COORDINATE_SYSTEMS = new Set<CoordinateSystem>(['screen', 'standard']);
 const CAMERA_PROJECTIONS = new Set<CameraProjection>(['perspective', 'orthographic']);
 const SIDES = new Set<'black' | 'white'>(['black', 'white']);
 const VIEWS = new Set<ViewMode>(['3d', '2d']);
@@ -159,12 +161,12 @@ function sanitize(raw: unknown): GameConfig {
   const size = number(value.boardSize, config.boardSize);
   if (isBoardSize(size)) config.boardSize = size;
   if (RULES.has(value.rules as Rules)) config.rules = value.rules as Rules;
-  if (COLUMN_LABELS.has(value.columnLabels as ColumnLabels)) {
-    config.columnLabels = value.columnLabels as ColumnLabels;
+  if (COORDINATE_SYSTEMS.has(value.coordinateSystem as CoordinateSystem)) {
+    config.coordinateSystem = value.coordinateSystem as CoordinateSystem;
   }
-  if (ROW_LABELS.has(value.rowLabels as RowLabels)) {
-    config.rowLabels = value.rowLabels as RowLabels;
-  }
+  config.columnLabels =
+    config.coordinateSystem === 'standard' ? 'letters' : 'numbers';
+  config.rowLabels = 'numbers';
   config.komi = number(value.komi, config.komi, 0);
   if (OPPONENTS.has(value.opponent as OpponentMode)) {
     config.opponent = value.opponent as OpponentMode;

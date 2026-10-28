@@ -43,6 +43,7 @@ export const COORD_LETTERS = 'ABCDEFGHJKLMNOPQRST';
 
 export type ColumnLabels = 'letters' | 'numbers' | 'none';
 export type RowLabels = 'numbers' | 'none';
+export type RowOrigin = 'top' | 'bottom';
 
 export function columnLabel(col: number, mode: ColumnLabels): string | null {
   if (mode === 'none') return null;
@@ -50,8 +51,48 @@ export function columnLabel(col: number, mode: ColumnLabels): string | null {
   return String(col + 1);
 }
 
-export function rowLabel(row: number, mode: RowLabels): string | null {
-  return mode === 'none' ? null : String(row + 1);
+export function rowLabel(
+  row: number,
+  mode: RowLabels,
+  origin: RowOrigin = 'top',
+  size = 19
+): string | null {
+  if (mode === 'none') return null;
+  return String(origin === 'top' ? row + 1 : size - row);
+}
+
+export interface BoardCoordinateOptions {
+  size: number;
+  columns: ColumnLabels;
+  rowOrigin: RowOrigin;
+  perspective: 'black' | 'white';
+}
+
+/**
+ * Formats a board intersection using the labels shown on the board. Column
+ * labels may be letters (`A`, `B`, ...) or numbers; row numbers start at the
+ * top or bottom depending on `rowOrigin`. The result matches what the player
+ * sees on the board, including the rotated White perspective.
+ */
+export function formatBoardCoordinate(
+  index: number | null,
+  options: BoardCoordinateOptions
+): string {
+  const { size, columns, rowOrigin, perspective } = options;
+  if (index === null || index < 0 || index >= size * size) return 'Pass';
+
+  const rawCol = index % size;
+  const rawRow = Math.floor(index / size);
+  const col = perspective === 'white' ? size - 1 - rawCol : rawCol;
+  const row = perspective === 'white' ? size - 1 - rawRow : rawRow;
+
+  const colText =
+    columns === 'letters'
+      ? COORD_LETTERS[col] ?? '?'
+      : String(col + 1);
+  const rowText = String(rowOrigin === 'top' ? row + 1 : size - row);
+
+  return columns === 'letters' ? `${colText}${rowText}` : `${colText},${rowText}`;
 }
 
 /**

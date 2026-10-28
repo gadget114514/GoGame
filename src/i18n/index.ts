@@ -5,6 +5,9 @@ export interface Translations {
   rules: string;
   rulesChinese: string;
   rulesTitle: string;
+  coordinateSystem: string;
+  coordinateScreen: string;
+  coordinateStandard: string;
   columnLabels: string;
   rowLabels: string;
   letters: string;
@@ -85,6 +88,10 @@ export interface Translations {
   quizTitle: string;
   answer: string;
   answerTitle: string;
+  quizLegendTitle: string;
+  quizBest: string;
+  quizWorst: string;
+  quizRandom: string;
   toggleView2D: string;
   toggleView3D: string;
   toggleViewTitle: string;
@@ -163,6 +170,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     rules: 'Rules',
     rulesChinese: 'Chinese',
     rulesTitle: 'Chinese rules: area scoring counts stones and surrounded territory.',
+    coordinateSystem: 'Coordinate System',
+    coordinateScreen: '1,1 (Top-left, numbers)',
+    coordinateStandard: 'A,1 (Bottom-left, standard)',
     columnLabels: 'Horizontal Labels',
     rowLabels: 'Vertical Labels',
     letters: 'Letters',
@@ -247,6 +257,10 @@ const DICTIONARIES: Record<Language, Translations> = {
     quizTitle: 'Mark several candidate moves',
     answer: 'Answer',
     answerTitle: 'Reveal: best blue, worst red, others white',
+    quizLegendTitle: 'Answer',
+    quizBest: 'Best move (blue)',
+    quizWorst: 'Worst move (red)',
+    quizRandom: 'Random (white)',
     toggleView2D: '2D',
     toggleView3D: '3D',
     toggleViewTitle: 'Toggle 2D / 3D view',
@@ -320,6 +334,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     rules: 'ルール',
     rulesChinese: '中国ルール',
     rulesTitle: '中国ルール：石と囲んだ地の合計（面積）で計算します。',
+    coordinateSystem: '座標系',
+    coordinateScreen: '1,1 (左上基準・数字)',
+    coordinateStandard: 'A,1 (左下基準・標準)',
     columnLabels: '横軸ラベル',
     rowLabels: '縦軸ラベル',
     letters: '英字',
@@ -404,6 +421,10 @@ const DICTIONARIES: Record<Language, Translations> = {
     quizTitle: '候補の交点をいくつかマーク',
     answer: '答え',
     answerTitle: '答え: 最善 青 / 最悪 赤 / ランダム 白',
+    quizLegendTitle: '答え',
+    quizBest: '最善手 (青)',
+    quizWorst: '最悪手 (赤)',
+    quizRandom: 'ランダム (白)',
     toggleView2D: '2D',
     toggleView3D: '3D',
     toggleViewTitle: '2D / 3D 表示切替',
@@ -477,6 +498,9 @@ const DICTIONARIES: Record<Language, Translations> = {
     rules: 'Reglas',
     rulesChinese: 'Chino',
     rulesTitle: 'Reglas chinas: puntuación por área (piedras y territorio rodeado).',
+    coordinateSystem: 'Sistema de coordenadas',
+    coordinateScreen: '1,1 (arriba a la izquierda, números)',
+    coordinateStandard: 'A,1 (abajo a la izquierda, estándar)',
     columnLabels: 'Etiquetas horizontales',
     rowLabels: 'Etiquetas verticales',
     letters: 'Letras',
@@ -561,6 +585,10 @@ const DICTIONARIES: Record<Language, Translations> = {
     quizTitle: 'Marcar varias jugadas candidatas',
     answer: 'Respuesta',
     answerTitle: 'Mostrar: mejor azul, peor rojo, otras blanco',
+    quizLegendTitle: 'Respuesta',
+    quizBest: 'Mejor jugada (azul)',
+    quizWorst: 'Peor jugada (rojo)',
+    quizRandom: 'Aleatoria (blanco)',
     toggleView2D: '2D',
     toggleView3D: '3D',
     toggleViewTitle: 'Alternar vista 2D / 3D',

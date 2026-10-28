@@ -35,7 +35,8 @@ describe('game config', () => {
 
     expect(config.boardSize).toBe(9);
     expect(config.rules).toBe('chinese');
-    expect(config.columnLabels).toBe('letters');
+    expect(config.coordinateSystem).toBe('screen');
+    expect(config.columnLabels).toBe('numbers');
     expect(config.rowLabels).toBe('numbers');
     expect(config.cameraProjection).toBe('orthographic');
     expect(config.komi).toBe(7);
@@ -61,8 +62,9 @@ describe('game config', () => {
       ...DEFAULT_CONFIG,
       boardSize: 13,
       rules: 'chinese',
-      columnLabels: 'numbers',
-      rowLabels: 'none',
+      coordinateSystem: 'standard',
+      columnLabels: 'letters',
+      rowLabels: 'numbers',
       hoverPreview: false,
       cameraProjection: 'perspective',
       komi: 7.5,
@@ -82,8 +84,9 @@ describe('game config', () => {
     const config = loadConfig();
 
     expect(config.boardSize).toBe(13);
-    expect(config.columnLabels).toBe('numbers');
-    expect(config.rowLabels).toBe('none');
+    expect(config.coordinateSystem).toBe('standard');
+    expect(config.columnLabels).toBe('letters');
+    expect(config.rowLabels).toBe('numbers');
     expect(config.hoverPreview).toBe(false);
     expect(config.komi).toBe(7.5);
     expect(config.pieceStyle).toBe('animal-bag');

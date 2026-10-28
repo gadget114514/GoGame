@@ -34,7 +34,8 @@ import {
   starPoints,
   type BoardSize,
   type ColumnLabels,
-  type RowLabels
+  type RowLabels,
+  type RowOrigin
 } from '../game/BoardSize';
 import type { Evaluation } from '../ai/KataGoEngine';
 import { detectTwoEyes, type EyeAnalysis } from '../game/eyes';
@@ -250,8 +251,10 @@ export class Board3D {
   private boardColor: BoardColor = 'wood';
   private columnLabels: ColumnLabels = 'letters';
   private rowLabels: RowLabels = 'numbers';
+  private rowOrigin: RowOrigin = 'top';
   private fenceModel: FenceModel = 'dark';
   private currentStyle: PieceStyle = 'kenney-pets';
+  private reviewBishopMode = false;
   private deadStoneStyle: DeadStoneStyle = 'cube';
   private perspective: 'black' | 'white' = 'black';
   private directional: DirectionalLight;
@@ -294,6 +297,7 @@ export class Board3D {
   private reviewCorrectMarker: Mesh;
   private quizMarkerMeshes: Mesh[] = [];
   private quizMarkerMaterials: StandardMaterial[] = [];
+  private quizMarkerEmphasis: boolean[] = [];
   private hoverHandler: ((index: number | null) => void) | null = null;
   private hoveredIndex: number | null = null;
   private hoverPreviewNode: TransformNode | null = null;
@@ -544,6 +548,7 @@ export class Board3D {
       ring.isVisible = false;
       this.quizMarkerMeshes.push(ring);
       this.quizMarkerMaterials.push(material);
+      this.quizMarkerEmphasis.push(false);
       this.glowLayer.addIncludedOnlyMesh(ring);
     }
 
@@ -551,6 +556,7 @@ export class Board3D {
     this.scene.onBeforeRenderObservable.add(() => this.updateOrthoBounds());
     this.scene.onBeforeRenderObservable.add(() => this.animateLastMoveMarker());
     this.scene.onBeforeRenderObservable.add(() => this.animateAlertPieces());
+    this.scene.onBeforeRenderObservable.add(() => this.animateQuizMarkers());
 
     this.attachPointer();
     window.addEventListener('resize', this.resize);
@@ -663,6 +669,17 @@ export class Board3D {
       await this.ensureStyleLoaded(style);
     }
     this.ready = true;
+    this.pieces.forEach((piece) => this.disposePiece(piece.root));
+    this.pieces.clear();
+    if (this.lastState) {
+      this.update(this.lastState);
+    }
+  }
+
+  setReviewBishopMode(active: boolean): void {
+    if (this.reviewBishopMode === active) return;
+    this.reviewBishopMode = active;
+    this.cancelCaptureEffects();
     this.pieces.forEach((piece) => this.disposePiece(piece.root));
     this.pieces.clear();
     if (this.lastState) {
@@ -897,16 +914,35 @@ export class Board3D {
       const marker = markers[i];
       if (!marker || marker.index < 0 || marker.index >= this.size * this.size) {
         mesh.isVisible = false;
+        this.quizMarkerEmphasis[i] = false;
         continue;
       }
       const n = this.size;
       const row = Math.floor(marker.index / n);
       const col = marker.index % n;
       mesh.position.set(this.worldCoordinateX(col), 0.07, this.worldCoordinateZ(row));
-      this.quizMarkerMaterials[i].emissiveColor.copyFrom(
-        Color3.FromHexString(marker.color)
+      const emphasis = marker.emphasis === true;
+      this.quizMarkerEmphasis[i] = emphasis;
+      const material = this.quizMarkerMaterials[i];
+      material.emissiveColor.copyFrom(
+        Color3.FromHexString(marker.color).scale(emphasis ? 1.7 : 1)
       );
+      material.alpha = emphasis ? 1 : 0.9;
       mesh.isVisible = true;
+    }
+  }
+
+  private animateQuizMarkers(): void {
+    const now = performance.now() / 1000;
+    for (let i = 0; i < this.quizMarkerMeshes.length; i++) {
+      const mesh = this.quizMarkerMeshes[i];
+      if (!mesh.isVisible) continue;
+      if (this.quizMarkerEmphasis[i]) {
+        const pulse = 1.18 + 0.08 * Math.sin(now * 5);
+        mesh.scaling.set(pulse, 1, pulse);
+      } else {
+        mesh.scaling.set(1, 1, 1);
+      }
     }
   }
 
@@ -934,7 +970,10 @@ export class Board3D {
     this.hoverMarker.isVisible = false;
     this.reviewPlayedMarker.isVisible = false;
     this.reviewCorrectMarker.isVisible = false;
-    for (const marker of this.quizMarkerMeshes) marker.isVisible = false;
+    for (let i = 0; i < this.quizMarkerMeshes.length; i++) {
+      this.quizMarkerMeshes[i].isVisible = false;
+      this.quizMarkerEmphasis[i] = false;
+    }
     this.clearHoverPreview();
     this.eyeDecorKey = '';
     this.eyeAnalysis = null;
@@ -1682,7 +1721,7 @@ export class Board3D {
 
       // Row labels (left and right border)
       const actualRow = isWhite ? n - 1 - i : i;
-      const rowStr = rowLabel(actualRow, this.rowLabels);
+      const rowStr = rowLabel(actualRow, this.rowLabels, this.rowOrigin, this.size);
       const isRowActive = actualRow === lastRow;
 
       if (rowStr !== null) {
@@ -1744,10 +1783,21 @@ export class Board3D {
     }
   }
 
-  setCoordinateLabels(columns: ColumnLabels, rows: RowLabels): void {
-    if (columns === this.columnLabels && rows === this.rowLabels) return;
+  setCoordinateLabels(
+    columns: ColumnLabels,
+    rows: RowLabels,
+    rowOrigin: RowOrigin = 'top'
+  ): void {
+    if (
+      columns === this.columnLabels &&
+      rows === this.rowLabels &&
+      rowOrigin === this.rowOrigin
+    ) {
+      return;
+    }
     this.columnLabels = columns;
     this.rowLabels = rows;
+    this.rowOrigin = rowOrigin;
     this.drawCoordinates(this.lastState?.goban.lastMove ?? null);
   }
 
@@ -1779,11 +1829,13 @@ export class Board3D {
       return wrapper;
     }
     if (this.fallback) {
-      this.buildPrimitive(wrapper, rank, color);
+      this.buildPrimitive(wrapper, this.reviewBishopMode ? 2 : rank, color);
       return wrapper;
     }
 
-    const file = PIECE_FILES[Math.max(0, Math.min(PIECE_FILES.length - 1, rank))];
+    const file: PieceFile = this.reviewBishopMode
+      ? 'bishop'
+      : PIECE_FILES[Math.max(0, Math.min(PIECE_FILES.length - 1, rank))];
     const containers = this.styleContainers.get(this.currentStyle);
     const container = containers?.get(file);
     if (!container) {

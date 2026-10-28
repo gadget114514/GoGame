@@ -5,7 +5,8 @@ import {
   rowLabel,
   starPoints,
   type ColumnLabels,
-  type RowLabels
+  type RowLabels,
+  type RowOrigin
 } from '../game/BoardSize';
 import { heatColor, type HeatmapTheme } from './heatmap';
 import { boardPalette, type BoardColor } from './boardTheme';
@@ -82,6 +83,7 @@ export class Board2D {
   private boardColor: BoardColor = 'wood';
   private columnLabels: ColumnLabels = 'letters';
   private rowLabels: RowLabels = 'numbers';
+  private rowOrigin: RowOrigin = 'top';
   private showEyeHighlight = false;
   private clickHandler: ((index: number) => void) | null = null;
   private hoverHandler: ((index: number | null) => void) | null = null;
@@ -115,10 +117,21 @@ export class Board2D {
     this.render();
   }
 
-  setCoordinateLabels(columns: ColumnLabels, rows: RowLabels): void {
-    if (columns === this.columnLabels && rows === this.rowLabels) return;
+  setCoordinateLabels(
+    columns: ColumnLabels,
+    rows: RowLabels,
+    rowOrigin: RowOrigin = 'top'
+  ): void {
+    if (
+      columns === this.columnLabels &&
+      rows === this.rowLabels &&
+      rowOrigin === this.rowOrigin
+    ) {
+      return;
+    }
     this.columnLabels = columns;
     this.rowLabels = rows;
+    this.rowOrigin = rowOrigin;
     this.render();
   }
 
@@ -286,7 +299,7 @@ export class Board2D {
 
       // Row labels (left and right border)
       const actualRow = isWhite ? this.size - 1 - i : i;
-      const rowStr = rowLabel(actualRow, this.rowLabels);
+      const rowStr = rowLabel(actualRow, this.rowLabels, this.rowOrigin, this.size);
       const isRowActive = actualRow === lastRow;
 
       if (rowStr !== null) {
@@ -552,10 +565,33 @@ export class Board2D {
       const qRow = Math.floor(marker.index / this.size);
       const qCol = marker.index % this.size;
       const { x, y } = this.coordToCanvas(qCol, qRow);
-      const r = radius * 0.82;
+      const r = radius * (marker.emphasis ? 0.92 : 0.82);
+      const lineWidth = Math.max(2, this.cell * (marker.emphasis ? 0.075 : 0.05));
 
       ctx.save();
-      ctx.globalAlpha = 0.22;
+      if (marker.emphasis) {
+        ctx.shadowColor = marker.color;
+        ctx.shadowBlur = this.cell * 0.55;
+      }
+
+      ctx.beginPath();
+      ctx.arc(x, y, r * 1.16, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.lineWidth = lineWidth + Math.max(2, this.cell * 0.035);
+      ctx.stroke();
+
+      if (marker.emphasis) {
+        ctx.beginPath();
+        ctx.arc(x, y, r * 1.28, 0, Math.PI * 2);
+        ctx.strokeStyle = marker.color;
+        ctx.globalAlpha = 0.4;
+        ctx.lineWidth = Math.max(2, this.cell * 0.035);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.save();
+      ctx.globalAlpha = marker.emphasis ? 0.4 : 0.28;
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fillStyle = marker.color;
@@ -565,13 +601,15 @@ export class Board2D {
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.strokeStyle = marker.color;
-      ctx.lineWidth = Math.max(2, this.cell * 0.05);
+      ctx.lineWidth = lineWidth;
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.arc(x, y, Math.max(2, radius * 0.16), 0, Math.PI * 2);
+      ctx.arc(x, y, Math.max(2, radius * 0.17), 0, Math.PI * 2);
       ctx.fillStyle = marker.color;
       ctx.fill();
+
+      ctx.restore();
     }
 
     // Hover preview ghost stone

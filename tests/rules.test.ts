@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { BLACK, EMPTY, Goban, WHITE } from '../src/game/Goban';
-import { formatCoordinate } from '../src/game/BoardSize';
+import {
+  formatBoardCoordinate,
+  formatCoordinate,
+  rowLabel
+} from '../src/game/BoardSize';
 
 const at = (size: number, row: number, col: number) => row * size + col;
 
@@ -94,6 +98,43 @@ describe('Goban rules', () => {
     // Pass and invalid coordinates
     expect(formatCoordinate(null, 19)).toBe('Pass');
     expect(formatCoordinate(-1, 19)).toBe('Pass');
+  });
+
+
+  it('formats board coordinates in screen and standard modes', () => {
+    const index = at(9, 5, 6);
+    const base = {
+      size: 9,
+      perspective: 'black' as const
+    };
+
+    expect(
+      formatBoardCoordinate(index, {
+        ...base,
+        columns: 'numbers',
+        rowOrigin: 'top'
+      })
+    ).toBe('7,6');
+
+    expect(
+      formatBoardCoordinate(index, {
+        ...base,
+        columns: 'letters',
+        rowOrigin: 'bottom'
+      })
+    ).toBe('G4');
+
+    expect(
+      formatBoardCoordinate(index, {
+        ...base,
+        columns: 'letters',
+        rowOrigin: 'bottom',
+        perspective: 'white'
+      })
+    ).toBe('C6');
+
+    expect(rowLabel(5, 'numbers', 'top', 9)).toBe('6');
+    expect(rowLabel(5, 'numbers', 'bottom', 9)).toBe('4');
   });
 
   it('clones game state independently', () => {

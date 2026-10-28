@@ -1,11 +1,12 @@
 import { Goban, BLACK, WHITE, type MoveRecord } from '../game/Goban';
 import {
   DEFAULT_KOMI,
-  formatCoordinate,
+  formatBoardCoordinate,
   isBoardSize,
   type BoardSize,
   type ColumnLabels,
-  type RowLabels
+  type RowLabels,
+  type RowOrigin
 } from '../game/BoardSize';
 import { KataGoEngine, type Evaluation } from '../ai/KataGoEngine';
 import type { AILevel } from '../ai/registry';
@@ -24,6 +25,7 @@ import { getLanguage, setLanguage, t, type Language } from '../i18n';
 import {
   loadConfig,
   saveConfig,
+  type CoordinateSystem,
   type GameConfig,
   type OpponentMode,
   type Rules,
@@ -61,8 +63,7 @@ interface Elements {
   canvas2d: HTMLCanvasElement;
   boardSize: HTMLSelectElement;
   rules: HTMLSelectElement;
-  columnLabels: HTMLSelectElement;
-  rowLabels: HTMLSelectElement;
+  coordinateSystem: HTMLSelectElement;
   cameraProjection: HTMLSelectElement;
   aiLevel: HTMLSelectElement;
   playerSide: HTMLSelectElement;
@@ -93,6 +94,7 @@ interface Elements {
   evaluate: HTMLButtonElement;
   quiz: HTMLButtonElement;
   answer: HTMLButtonElement;
+  quizLegend: HTMLElement;
   view: HTMLButtonElement;
   save: HTMLButtonElement;
   load: HTMLButtonElement;
@@ -170,7 +172,8 @@ export class GameController {
   private goban: Goban;
   private opponent: OpponentMode = 'dan';
   private rules: Rules = 'chinese';
-  private columnLabels: ColumnLabels = 'letters';
+  private coordinateSystem: CoordinateSystem = 'screen';
+  private columnLabels: ColumnLabels = 'numbers';
   private rowLabels: RowLabels = 'numbers';
   private cameraProjection: CameraProjection = 'orthographic';
   private playerSide: 'black' | 'white' = 'black';
@@ -191,6 +194,10 @@ export class GameController {
 
   private get level(): AILevel {
     return this.opponent === 'kyu' ? 'kyu' : 'dan';
+  }
+
+  private get rowOrigin(): RowOrigin {
+    return this.coordinateSystem === 'standard' ? 'bottom' : 'top';
   }
 
   private isManualMode(): boolean {
@@ -229,12 +236,14 @@ export class GameController {
   private reviewAwaitingAnswer = false;
   private reviewToken = 0;
   private reviewReturnIndex = 0;
+  private reviewStartStep = 1;
 
   private quizToken = 0;
   private quizBusy = false;
   private quizActive = false;
   private quizRevealed = false;
   private quizCandidates: QuizCandidate[] = [];
+  private reviewStyleApplied = false;
 
   constructor() {
     this.els = {
@@ -242,8 +251,7 @@ export class GameController {
       canvas2d: requireElement('scene2d'),
       boardSize: requireElement('board-size'),
       rules: requireElement('rules'),
-      columnLabels: requireElement('column-labels'),
-      rowLabels: requireElement('row-labels'),
+      coordinateSystem: requireElement('coordinate-system'),
       cameraProjection: requireElement('camera-projection'),
       aiLevel: requireElement('ai-level'),
       playerSide: requireElement('player-side'),
@@ -280,6 +288,7 @@ export class GameController {
       evaluate: requireElement('btn-eval'),
       quiz: requireElement('btn-quiz'),
       answer: requireElement('btn-answer'),
+      quizLegend: requireElement('quiz-legend'),
       view: requireElement('btn-view'),
       save: requireElement('btn-save'),
       load: requireElement('btn-load'),
@@ -325,6 +334,7 @@ export class GameController {
     this.config = loadConfig();
     this.opponent = this.config.opponent;
     this.rules = this.config.rules;
+    this.coordinateSystem = this.config.coordinateSystem;
     this.columnLabels = this.config.columnLabels;
     this.rowLabels = this.config.rowLabels;
     this.cameraProjection = this.config.cameraProjection;
@@ -350,8 +360,7 @@ export class GameController {
 
     this.els.boardSize.value = String(this.config.boardSize);
     this.els.rules.value = this.rules;
-    this.els.columnLabels.value = this.columnLabels;
-    this.els.rowLabels.value = this.rowLabels;
+    this.els.coordinateSystem.value = this.coordinateSystem;
     this.els.cameraProjection.value = this.cameraProjection;
     this.els.komi.value = String(this.config.komi);
     this.els.aiLevel.value = this.opponent;
@@ -401,10 +410,10 @@ export class GameController {
     this.board3d.setPerspective(this.playerSide);
     this.setDeadStoneStyle(this.deadStoneStyle);
     void this.board3d.setPieceStyle(this.pieceStyle);
-    this.board3d.setCoordinateLabels(this.columnLabels, this.rowLabels);
+    this.board3d.setCoordinateLabels(this.columnLabels, this.rowLabels, this.rowOrigin);
     this.board2d.resize();
     this.board2d.setPerspective(this.playerSide);
-    this.board2d.setCoordinateLabels(this.columnLabels, this.rowLabels);
+    this.board2d.setCoordinateLabels(this.columnLabels, this.rowLabels, this.rowOrigin);
 
     this.board3d.setOnIntersectionClick((index) => this.onBoardClick(index));
     this.board2d.setOnIntersectionClick((index) => this.onBoardClick(index));
@@ -460,19 +469,26 @@ export class GameController {
       this.rules = this.els.rules.value === 'chinese' ? 'chinese' : 'chinese';
       this.persistConfig();
     });
-    this.els.columnLabels.addEventListener('change', () => {
-      const value = this.els.columnLabels.value;
+    this.els.coordinateSystem.addEventListener('change', () => {
+      this.coordinateSystem =
+        this.els.coordinateSystem.value === 'standard' ? 'standard' : 'screen';
       this.columnLabels =
-        value === 'numbers' || value === 'none' ? value : 'letters';
-      this.board3d.setCoordinateLabels(this.columnLabels, this.rowLabels);
-      this.board2d.setCoordinateLabels(this.columnLabels, this.rowLabels);
+        this.coordinateSystem === 'standard' ? 'letters' : 'numbers';
+      this.rowLabels = 'numbers';
+      this.board3d.setCoordinateLabels(
+        this.columnLabels,
+        this.rowLabels,
+        this.rowOrigin
+      );
+      this.board2d.setCoordinateLabels(
+        this.columnLabels,
+        this.rowLabels,
+        this.rowOrigin
+      );
       this.persistConfig();
-    });
-    this.els.rowLabels.addEventListener('change', () => {
-      this.rowLabels = this.els.rowLabels.value === 'none' ? 'none' : 'numbers';
-      this.board3d.setCoordinateLabels(this.columnLabels, this.rowLabels);
-      this.board2d.setCoordinateLabels(this.columnLabels, this.rowLabels);
-      this.persistConfig();
+      this.updateStatus();
+      if (this.reviewActive) this.updateReviewText();
+      this.render();
     });
     this.els.playerSide.addEventListener('change', () => {
       const side = (this.els.playerSide.value as 'black' | 'white') || 'black';
@@ -755,6 +771,7 @@ export class GameController {
       version: 1,
       boardSize: this.goban.size,
       rules: this.rules,
+      coordinateSystem: this.coordinateSystem,
       columnLabels: this.columnLabels,
       rowLabels: this.rowLabels,
       cameraProjection: this.cameraProjection,
@@ -830,6 +847,17 @@ export class GameController {
     this.els.gameOverModal.hidden = true;
   }
 
+  private applyReviewStyle(active: boolean): void {
+    if (active) {
+      this.reviewStyleApplied = true;
+      this.board3d.setReviewBishopMode(true);
+    } else if (this.reviewStyleApplied) {
+      this.reviewStyleApplied = false;
+      this.board3d.setReviewBishopMode(false);
+    }
+    this.applyLegendStyle();
+  }
+
   private onBoardClick(index: number): void {
     if (this.reviewActive) {
       void this.answerReview(index);
@@ -851,6 +879,7 @@ export class GameController {
     this.board2d.setReviewMarkers(null, null);
     this.els.quiz.disabled = false;
     this.els.answer.disabled = false;
+    if (this.reviewStyleApplied) this.applyReviewStyle(false);
     if (wasActive) {
       this.busy = false;
       this.setThinking(false);
@@ -865,6 +894,9 @@ export class GameController {
     this.hideGameOverDialog();
     this.reviewReturnIndex = this.history.length - 1;
     this.reviewActive = true;
+    this.evaluation = null;
+    this.applyReviewStyle(true);
+    this.render();
     this.reviewProblems = [];
     this.reviewIndex = 0;
     this.reviewReady = false;
@@ -911,7 +943,7 @@ export class GameController {
   private async collectReviewCandidates(token: number): Promise<ReviewCandidate[]> {
     const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
     const inputs: ReviewCandidateInput[] = [];
-    for (let step = 1; step < this.history.length; step++) {
+    for (let step = Math.max(1, this.reviewStartStep); step < this.history.length; step++) {
       if (token !== this.reviewToken) return [];
       const record = this.history[step].moveRecord;
       if (!record || record.move === null) continue;
@@ -1180,6 +1212,7 @@ export class GameController {
       evalPoint: snapshot.evalPoint ? { ...snapshot.evalPoint } : null
     }));
     this.currentHistoryIndex = this.history.length - 1;
+    this.reviewStartStep = this.history.length;
     this.goban = this.gobanFromSnapshot(this.history[this.currentHistoryIndex]);
     this.gameOver = false;
     this.evaluation = null;
@@ -1283,12 +1316,16 @@ export class GameController {
       index: candidate.index,
       color: this.quizRevealed
         ? revealedColors[candidate.role]
-        : '#f5c451'
+        : '#f5c451',
+      emphasis:
+        this.quizRevealed &&
+        (candidate.role === 'best' || candidate.role === 'worst')
     }));
     this.board3d.setQuizMarkers(markers);
     this.board2d.setQuizMarkers(markers);
     this.els.quiz.classList.toggle('active', this.quizActive);
     this.els.answer.classList.toggle('active', this.quizActive && this.quizRevealed);
+    this.els.quizLegend.hidden = !(this.quizActive && this.quizRevealed);
   }
 
   private clearQuizMarkers(): void {
@@ -1302,6 +1339,7 @@ export class GameController {
     this.board2d.setQuizMarkers([]);
     this.els.quiz.classList.remove('active');
     this.els.answer.classList.remove('active');
+    this.els.quizLegend.hidden = true;
     if (wasBusy) {
       this.busy = false;
       this.setThinking(false);
@@ -1314,7 +1352,9 @@ export class GameController {
     const isChess = this.pieceStyle === 'clayfoot' || this.pieceStyle === 'dark-yagami';
     legend.classList.toggle('legend-text-only', !isChess);
     legend.style.display =
-      this.view === '3d' && this.pieceStyle !== 'stones' ? '' : 'none';
+      this.view === '3d' && this.pieceStyle !== 'stones' && !this.reviewActive
+        ? ''
+        : 'none';
     this.applyLegendLabels();
   }
 
@@ -1443,6 +1483,7 @@ export class GameController {
     this.board3d.setPerspective(side);
     this.board2d.setPerspective(side);
     this.updateStatus();
+    if (this.reviewActive) this.updateReviewText();
     if (this.goban.moves.length === 0 && side === 'white' && !this.busy && !this.isManualMode()) {
       void this.aiTurn();
     }
@@ -1523,6 +1564,7 @@ export class GameController {
   }
 
   private resetHistory(): void {
+    this.reviewStartStep = 1;
     this.stopReplay();
     this.cancelBackgroundEvaluation();
     this.hideGameOverDialog();
@@ -1699,6 +1741,7 @@ export class GameController {
 
     if (this.currentHistoryIndex < this.history.length - 1) {
       this.history = this.history.slice(0, this.currentHistoryIndex + 1);
+      this.reviewStartStep = Math.min(this.reviewStartStep, this.history.length);
       this.evalGraph.pruneAfter(this.currentHistoryIndex);
       this.restoreSnapshot(this.history[this.currentHistoryIndex]);
     }
@@ -1737,6 +1780,7 @@ export class GameController {
 
     if (this.currentHistoryIndex < this.history.length - 1) {
       this.history = this.history.slice(0, this.currentHistoryIndex + 1);
+      this.reviewStartStep = Math.min(this.reviewStartStep, this.history.length);
       this.evalGraph.pruneAfter(this.currentHistoryIndex);
       this.restoreSnapshot(this.history[this.currentHistoryIndex]);
     }
@@ -1863,6 +1907,7 @@ export class GameController {
     }
 
     this.history = this.history.slice(0, targetIndex + 1);
+    this.reviewStartStep = Math.min(this.reviewStartStep, this.history.length);
     this.evalGraph.pruneAfter(targetIndex);
     this.goToStep(targetIndex);
     this.gameOver = false;
@@ -1983,7 +2028,7 @@ export class GameController {
       showTwoEyeHighlight: this.eyeHighlightEnabled,
       rankThresholds: this.rankThresholds[this.goban.size],
       showHoverPreview,
-      wallModel: this.wallModel,
+      wallModel: this.reviewActive ? 'off' : this.wallModel,
       fenceModel: this.fenceModel,
       trueEyeModel: this.trueEyeModel,
       showFalseEyeModels: this.falseEyeModelsEnabled,
@@ -2001,12 +2046,12 @@ export class GameController {
   }
 
   private formatIntersection(index: number): string {
-    const col = index % this.goban.size;
-    const row = Math.floor(index / this.goban.size);
-    const colNum = col + 1;
-    const rowNum = row + 1;
-    const standard = formatCoordinate(index, this.goban.size);
-    return `${colNum},${rowNum} (${standard})`;
+    return formatBoardCoordinate(index, {
+      size: this.goban.size,
+      columns: this.columnLabels,
+      rowOrigin: this.rowOrigin,
+      perspective: this.playerSide
+    });
   }
 
   private updateStatus(): void {
@@ -2217,6 +2262,8 @@ export class GameController {
           comment: m.comment
         });
       }
+
+      this.reviewStartStep = 1;
 
       // Jump to the final move for initial view
       this.currentHistoryIndex = this.history.length - 1;
