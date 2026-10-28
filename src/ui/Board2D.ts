@@ -11,6 +11,7 @@ import { heatColor, type HeatmapTheme } from './heatmap';
 import { boardPalette, type BoardColor } from './boardTheme';
 import { pieceRank } from './pieceRank';
 import { detectTwoEyes } from '../game/eyes';
+import type { BoardMarker } from './boardMarkers';
 
 export interface Board2DLayout {
   originX: number;
@@ -85,6 +86,9 @@ export class Board2D {
   private clickHandler: ((index: number) => void) | null = null;
   private hoverHandler: ((index: number | null) => void) | null = null;
   private hoverIndex: number | null = null;
+  private reviewPlayed: number | null = null;
+  private reviewCorrect: number | null = null;
+  private quizMarkers: BoardMarker[] = [];
   private perspective: 'black' | 'white' = 'black';
 
   private prevMoveCount = 0;
@@ -124,6 +128,18 @@ export class Board2D {
 
   setOnIntersectionHover(handler: (index: number | null) => void): void {
     this.hoverHandler = handler;
+  }
+
+  setReviewMarkers(played: number | null, correct: number | null): void {
+    if (this.reviewPlayed === played && this.reviewCorrect === correct) return;
+    this.reviewPlayed = played;
+    this.reviewCorrect = correct;
+    this.render();
+  }
+
+  setQuizMarkers(markers: readonly BoardMarker[]): void {
+    this.quizMarkers = markers.map((marker) => ({ ...marker }));
+    this.render();
   }
 
   resize = (): void => {
@@ -491,6 +507,70 @@ export class Board2D {
       ctx.beginPath();
       ctx.arc(cx, cy, Math.max(2.5, radius * 0.18), 0, Math.PI * 2);
       ctx.fillStyle = color === BLACK ? '#ffffff' : '#0f172a';
+      ctx.fill();
+    }
+
+    // Review markers: the move that was played (red) and the best move (green).
+    if (this.reviewPlayed !== null) {
+      const pRow = Math.floor(this.reviewPlayed / this.size);
+      const pCol = this.reviewPlayed % this.size;
+      const { x, y } = this.coordToCanvas(pCol, pRow);
+      const r = radius * 0.95;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ff5f45';
+      ctx.lineWidth = Math.max(2, this.cell * 0.055);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x - r * 0.55, y - r * 0.55);
+      ctx.lineTo(x + r * 0.55, y + r * 0.55);
+      ctx.moveTo(x + r * 0.55, y - r * 0.55);
+      ctx.lineTo(x - r * 0.55, y + r * 0.55);
+      ctx.stroke();
+    }
+
+    if (this.reviewCorrect !== null) {
+      const cRow = Math.floor(this.reviewCorrect / this.size);
+      const cCol = this.reviewCorrect % this.size;
+      const { x, y } = this.coordToCanvas(cCol, cRow);
+      const r = radius * 0.95;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = '#35d07f';
+      ctx.lineWidth = Math.max(2, this.cell * 0.055);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x - r * 0.42, y);
+      ctx.lineTo(x - r * 0.1, y + r * 0.38);
+      ctx.lineTo(x + r * 0.45, y - r * 0.35);
+      ctx.stroke();
+    }
+
+    // Quiz candidate markers.
+    for (const marker of this.quizMarkers) {
+      if (marker.index < 0 || marker.index >= this.size * this.size) continue;
+      const qRow = Math.floor(marker.index / this.size);
+      const qCol = marker.index % this.size;
+      const { x, y } = this.coordToCanvas(qCol, qRow);
+      const r = radius * 0.82;
+
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = marker.color;
+      ctx.fill();
+      ctx.restore();
+
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = marker.color;
+      ctx.lineWidth = Math.max(2, this.cell * 0.05);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(2, radius * 0.16), 0, Math.PI * 2);
+      ctx.fillStyle = marker.color;
       ctx.fill();
     }
 

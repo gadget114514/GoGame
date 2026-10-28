@@ -17,6 +17,8 @@
           <button id="btn-pass" data-i18n="pass" data-i18n-title="passTitle" title="Pass">Pass</button>
           <button id="btn-undo" data-i18n="undo" data-i18n-title="undoTitle" title="Undo">Undo</button>
           <button id="btn-eval" data-i18n="eval" data-i18n-title="evalTitle" title="Evaluate position">Eval</button>
+          <button id="btn-quiz" data-i18n="quiz" data-i18n-title="quizTitle" title="Mark quiz candidates">Quiz</button>
+          <button id="btn-answer" data-i18n="answer" data-i18n-title="answerTitle" title="Reveal the best and worst moves">Answer</button>
           <button id="btn-view" data-i18n-title="toggleViewTitle" title="Toggle 2D / 3D">2D</button>
           <button id="btn-save" data-i18n="save" data-i18n-title="saveTitle" title="Save SGF">Save</button>
           <button id="btn-load" data-i18n="load" data-i18n-title="loadTitle" title="Load SGF">Load</button>
@@ -66,6 +68,22 @@
         <div id="thinking" class="overlay" hidden><span class="spinner"></span> <span data-i18n="thinking">Thinking…</span></div>
         <div id="boot" class="overlay" data-i18n="bootLoading">Loading KataGo model…</div>
       </main>
+
+      <section id="review-modal" class="review-panel" role="region" aria-labelledby="review-title" hidden>
+        <div class="review-header">
+          <h2 id="review-title" data-i18n="reviewTitle">Game Review</h2>
+        </div>
+        <div class="review-body">
+          <p id="review-progress" class="review-progress"></p>
+          <p id="review-question" class="review-question"></p>
+          <p id="review-feedback" class="review-feedback" role="status" aria-live="polite"></p>
+        </div>
+        <div class="review-actions">
+          <button id="btn-review-continue" data-i18n="reviewContinue">Continue from here</button>
+          <button id="btn-review-next" data-i18n="reviewNext">Next problem</button>
+          <button id="btn-close-review" class="credits-close" data-i18n-title="reviewClose" title="Close" aria-label="Close">&times;</button>
+        </div>
+      </section>
 
       <section id="eval-graph-panel" class="eval-graph-panel" aria-label="Evaluation Graph">
         <div class="eval-graph-header">
@@ -281,6 +299,9 @@
           <div class="game-over-body">
             <p id="game-over-result" class="game-over-result"></p>
             <p id="game-over-score" class="game-over-score"></p>
+            <div class="game-over-actions">
+              <button id="btn-review" class="primary" data-i18n="review" data-i18n-title="reviewTitle" title="Review mistakes and try the best move">Review</button>
+            </div>
           </div>
         </div>
       </div>

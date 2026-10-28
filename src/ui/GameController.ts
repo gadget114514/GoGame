@@ -30,6 +30,18 @@ import {
   type ViewMode
 } from '../config';
 import { generateSGF, parseSGF } from '../game/sgf';
+import {
+  detectMistakes,
+  humanWinrate,
+  REVIEW_CORRECT_TOLERANCE,
+  type ReviewCandidate,
+  type ReviewCandidateInput
+} from '../game/review';
+import {
+  selectQuizCandidates,
+  type QuizCandidate,
+  type QuizRole
+} from '../game/quiz';
 import { EvalGraph, type EvalPoint } from './EvalGraph';
 import {
   defaultThresholds,
@@ -41,6 +53,7 @@ import { isHeatmapTheme, type HeatmapTheme } from './heatmap';
 import { isBoardColor, type BoardColor } from './boardTheme';
 import { isFenceModel, type FenceModel } from './fenceModels';
 import { STYLE_PRESETS } from './stylePresets';
+import type { BoardMarker } from './boardMarkers';
 import thirdpartyText from '../../thirdparty.txt?raw';
 
 interface Elements {
@@ -78,6 +91,8 @@ interface Elements {
   pass: HTMLButtonElement;
   undo: HTMLButtonElement;
   evaluate: HTMLButtonElement;
+  quiz: HTMLButtonElement;
+  answer: HTMLButtonElement;
   view: HTMLButtonElement;
   save: HTMLButtonElement;
   load: HTMLButtonElement;
@@ -93,6 +108,14 @@ interface Elements {
   gameOverResult: HTMLElement;
   gameOverScore: HTMLElement;
   gameOverClose: HTMLButtonElement;
+  gameOverReview: HTMLButtonElement;
+  reviewModal: HTMLElement;
+  reviewProgress: HTMLElement;
+  reviewQuestion: HTMLElement;
+  reviewFeedback: HTMLElement;
+  reviewContinue: HTMLButtonElement;
+  reviewNext: HTMLButtonElement;
+  reviewClose: HTMLButtonElement;
   thinking: HTMLElement;
   boot: HTMLElement;
   turn: HTMLElement;
@@ -123,6 +146,11 @@ interface HistorySnapshot {
   moveRecord: MoveRecord | null;
   comment?: string;
   evalPoint?: EvalPoint | null;
+}
+
+interface ReviewProblem extends ReviewCandidate {
+  bestMove?: number | null;
+  bestHumanWinrate?: number;
 }
 
 function requireElement<T extends HTMLElement>(id: string): T {
@@ -194,6 +222,20 @@ export class GameController {
   private replayTimer: number | null = null;
   private replaySpeed = 1000;
 
+  private reviewActive = false;
+  private reviewProblems: ReviewProblem[] = [];
+  private reviewIndex = 0;
+  private reviewReady = false;
+  private reviewAwaitingAnswer = false;
+  private reviewToken = 0;
+  private reviewReturnIndex = 0;
+
+  private quizToken = 0;
+  private quizBusy = false;
+  private quizActive = false;
+  private quizRevealed = false;
+  private quizCandidates: QuizCandidate[] = [];
+
   constructor() {
     this.els = {
       canvas3d: requireElement('scene3d'),
@@ -236,6 +278,8 @@ export class GameController {
       pass: requireElement('btn-pass'),
       undo: requireElement('btn-undo'),
       evaluate: requireElement('btn-eval'),
+      quiz: requireElement('btn-quiz'),
+      answer: requireElement('btn-answer'),
       view: requireElement('btn-view'),
       save: requireElement('btn-save'),
       load: requireElement('btn-load'),
@@ -251,6 +295,14 @@ export class GameController {
       gameOverResult: requireElement('game-over-result'),
       gameOverScore: requireElement('game-over-score'),
       gameOverClose: requireElement('btn-close-game-over'),
+      gameOverReview: requireElement('btn-review'),
+      reviewModal: requireElement('review-modal'),
+      reviewProgress: requireElement('review-progress'),
+      reviewQuestion: requireElement('review-question'),
+      reviewFeedback: requireElement('review-feedback'),
+      reviewContinue: requireElement('btn-review-continue'),
+      reviewNext: requireElement('btn-review-next'),
+      reviewClose: requireElement('btn-close-review'),
       thinking: requireElement('thinking'),
       boot: requireElement('boot'),
       turn: requireElement('turn'),
@@ -354,8 +406,8 @@ export class GameController {
     this.board2d.setPerspective(this.playerSide);
     this.board2d.setCoordinateLabels(this.columnLabels, this.rowLabels);
 
-    this.board3d.setOnIntersectionClick((index) => void this.humanPlay(index));
-    this.board2d.setOnIntersectionClick((index) => void this.humanPlay(index));
+    this.board3d.setOnIntersectionClick((index) => this.onBoardClick(index));
+    this.board2d.setOnIntersectionClick((index) => this.onBoardClick(index));
 
     this.board3d.setOnIntersectionHover((index) => this.onHoverIntersection(index));
     this.board2d.setOnIntersectionHover((index) => this.onHoverIntersection(index));
@@ -392,6 +444,8 @@ export class GameController {
     this.els.pass.addEventListener('click', () => void this.humanPass());
     this.els.undo.addEventListener('click', () => void this.undo());
     this.els.evaluate.addEventListener('click', () => void this.refreshEvaluation(true));
+    this.els.quiz.addEventListener('click', () => void this.toggleQuiz());
+    this.els.answer.addEventListener('click', () => void this.answerQuiz());
     this.els.view.addEventListener('click', () => this.toggleView());
 
     this.els.boardSize.addEventListener('change', () => this.changeBoardSize());
@@ -561,6 +615,10 @@ export class GameController {
     this.els.gameOverModal.addEventListener('click', (event) => {
       if (event.target === this.els.gameOverModal) this.closeGameOverDialog();
     });
+    this.els.gameOverReview.addEventListener('click', () => void this.startReview());
+    this.els.reviewClose.addEventListener('click', () => this.closeReview());
+    this.els.reviewContinue.addEventListener('click', () => this.continueFromReview());
+    this.els.reviewNext.addEventListener('click', () => void this.showNextReviewProblem());
 
     this.els.btnFirst.addEventListener('click', () => this.firstMove());
     this.els.btnPrev.addEventListener('click', () => this.prevMove());
@@ -580,6 +638,11 @@ export class GameController {
     window.addEventListener('keydown', (e) => {
       const activeTag = (document.activeElement?.tagName || '').toLowerCase();
       if (e.key === 'Escape') {
+        if (!this.els.reviewModal.hidden) {
+          e.preventDefault();
+          this.closeReview();
+          return;
+        }
         if (!this.els.gameOverModal.hidden) {
           e.preventDefault();
           this.closeGameOverDialog();
@@ -635,6 +698,7 @@ export class GameController {
     this.applyLegendLabels();
     this.updateViewButtonText();
     this.updateStatus();
+    if (this.reviewActive) this.updateReviewText();
   }
 
   private setDeadStoneStyle(style: DeadStoneStyle): void {
@@ -764,6 +828,484 @@ export class GameController {
 
   private hideGameOverDialog(): void {
     this.els.gameOverModal.hidden = true;
+  }
+
+  private onBoardClick(index: number): void {
+    if (this.reviewActive) {
+      void this.answerReview(index);
+      return;
+    }
+    void this.humanPlay(index);
+  }
+
+  private resetReviewState(): void {
+    const wasActive = this.reviewActive;
+    this.reviewActive = false;
+    this.reviewToken++;
+    this.reviewProblems = [];
+    this.reviewIndex = 0;
+    this.reviewReady = false;
+    this.reviewAwaitingAnswer = false;
+    this.els.reviewModal.hidden = true;
+    this.board3d.setReviewMarkers(null, null);
+    this.board2d.setReviewMarkers(null, null);
+    this.els.quiz.disabled = false;
+    this.els.answer.disabled = false;
+    if (wasActive) {
+      this.busy = false;
+      this.setThinking(false);
+    }
+  }
+
+  private async startReview(): Promise<void> {
+    if (this.reviewActive || this.history.length <= 1) return;
+    this.clearQuizMarkers();
+    this.stopReplay();
+    this.clearHover();
+    this.hideGameOverDialog();
+    this.reviewReturnIndex = this.history.length - 1;
+    this.reviewActive = true;
+    this.reviewProblems = [];
+    this.reviewIndex = 0;
+    this.reviewReady = false;
+    this.reviewAwaitingAnswer = false;
+    const token = ++this.reviewToken;
+
+    this.els.reviewModal.hidden = false;
+    this.els.reviewProgress.textContent = '';
+    this.els.reviewQuestion.textContent = t('reviewAnalyzing');
+    this.els.reviewFeedback.textContent = '';
+    this.els.reviewFeedback.className = 'review-feedback';
+    this.els.reviewContinue.disabled = true;
+    this.els.reviewNext.disabled = true;
+    this.els.quiz.disabled = true;
+    this.els.answer.disabled = true;
+    this.busy = true;
+    this.setThinking(true);
+
+    try {
+      const candidates = await this.collectReviewCandidates(token);
+      if (token !== this.reviewToken) return;
+      if (candidates.length === 0) {
+        this.els.reviewProgress.textContent = '';
+        this.els.reviewQuestion.textContent = t('reviewNoMistakes');
+        this.els.reviewContinue.disabled = true;
+        this.els.reviewNext.disabled = true;
+        return;
+      }
+      this.reviewProblems = candidates;
+      await this.showReviewProblem(0, token);
+    } catch (error) {
+      console.error('Review analysis failed', error);
+      if (token === this.reviewToken) {
+        this.els.reviewQuestion.textContent = t('aiError');
+      }
+    } finally {
+      if (token === this.reviewToken) {
+        this.busy = false;
+        this.setThinking(false);
+      }
+    }
+  }
+
+  private async collectReviewCandidates(token: number): Promise<ReviewCandidate[]> {
+    const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
+    const inputs: ReviewCandidateInput[] = [];
+    for (let step = 1; step < this.history.length; step++) {
+      if (token !== this.reviewToken) return [];
+      const record = this.history[step].moveRecord;
+      if (!record || record.move === null) continue;
+      if (this.history[step - 1].side !== record.color) continue;
+      if (!this.isManualMode() && record.color !== humanColor) continue;
+
+      const before = await this.ensureWinrate(step - 1, token);
+      if (before === null) return [];
+      const after = await this.ensureWinrate(step, token);
+      if (after === null) return [];
+
+      inputs.push({
+        step,
+        color: record.color,
+        playedMove: record.move,
+        beforeBlackWinrate: before,
+        afterBlackWinrate: after
+      });
+    }
+    return detectMistakes(inputs);
+  }
+
+  private async ensureWinrate(step: number, token: number): Promise<number | null> {
+    const snapshot = this.history[step];
+    if (!snapshot) return null;
+    if (snapshot.evalPoint) return snapshot.evalPoint.winrate;
+
+    const goban = this.gobanFromSnapshot(snapshot);
+    const evaluation = await this.engine.evaluate(goban, this.level);
+    if (token !== this.reviewToken) return null;
+
+    const point: EvalPoint = {
+      moveNum: step,
+      winrate: evaluation.winrate,
+      scoreLead: evaluation.scoreLead,
+      color: snapshot.moveRecord?.color ?? 0
+    };
+    snapshot.evalPoint = point;
+    this.evalGraph.setPoint(point);
+    return evaluation.winrate;
+  }
+
+  private async showReviewProblem(index: number, token: number): Promise<void> {
+    const problem = this.reviewProblems[index];
+    if (!problem) return;
+
+    this.reviewIndex = index;
+    this.reviewReady = false;
+    this.reviewAwaitingAnswer = true;
+
+    const beforeStep = problem.step - 1;
+    this.currentHistoryIndex = beforeStep;
+    this.restoreSnapshot(this.history[beforeStep]);
+    this.clearHover();
+    this.evaluation = null;
+    this.updateReplayUI();
+    this.evalGraph.setCurrentStep(beforeStep);
+    this.render();
+    this.updateStatus();
+    this.board3d.setReviewMarkers(problem.playedMove, null);
+    this.board2d.setReviewMarkers(problem.playedMove, null);
+
+    this.updateReviewText();
+    this.els.reviewFeedback.textContent = t('reviewPick');
+    this.els.reviewFeedback.className = 'review-feedback';
+    this.els.reviewContinue.disabled = true;
+    this.els.reviewNext.disabled = true;
+
+    this.busy = true;
+    this.setThinking(true);
+    try {
+      await this.prepareReviewProblem(problem, token);
+    } catch (error) {
+      console.error('Review problem preparation failed', error);
+    } finally {
+      if (token === this.reviewToken) {
+        this.busy = false;
+        this.setThinking(false);
+        this.reviewReady =
+          problem.bestMove !== undefined && problem.bestMove !== null;
+        this.els.reviewContinue.disabled = false;
+        this.els.reviewNext.disabled = index >= this.reviewProblems.length - 1;
+        this.els.reviewFeedback.textContent = this.reviewReady
+          ? t('reviewPick')
+          : t('aiError');
+      }
+    }
+  }
+
+  private async prepareReviewProblem(
+    problem: ReviewProblem,
+    token: number
+  ): Promise<void> {
+    if (problem.bestMove !== undefined) return;
+
+    const before = this.gobanFromSnapshot(this.history[problem.step - 1]);
+    const evaluation = await this.engine.evaluate(before, this.level);
+    if (token !== this.reviewToken) return;
+
+    let bestMove: number | null = null;
+    let bestPolicy = -Infinity;
+    for (let index = 0; index < before.area; index++) {
+      const policy = evaluation.policy[index] ?? 0;
+      if (policy > bestPolicy && before.legal(index)) {
+        bestPolicy = policy;
+        bestMove = index;
+      }
+    }
+
+    if (bestMove === null) {
+      problem.bestMove = null;
+      return;
+    }
+
+    const after = before.clone();
+    if (!after.play(bestMove)) {
+      problem.bestMove = null;
+      return;
+    }
+
+    const afterEvaluation = await this.engine.evaluate(after, this.level);
+    if (token !== this.reviewToken) return;
+
+    problem.bestMove = bestMove;
+    problem.bestHumanWinrate = humanWinrate(
+      problem.color,
+      afterEvaluation.winrate
+    );
+  }
+
+  private updateReviewText(): void {
+    const problem = this.reviewProblems[this.reviewIndex];
+    if (!problem) {
+      this.els.reviewProgress.textContent = '';
+      return;
+    }
+    this.els.reviewProgress.textContent = t('reviewProblem', {
+      current: this.reviewIndex + 1,
+      total: this.reviewProblems.length
+    });
+    this.els.reviewQuestion.textContent = t('reviewQuestion', {
+      coord: this.formatIntersection(problem.playedMove)
+    });
+  }
+
+  private async answerReview(index: number): Promise<void> {
+    const problem = this.reviewProblems[this.reviewIndex];
+    if (
+      !this.reviewActive ||
+      this.busy ||
+      !this.reviewReady ||
+      !this.reviewAwaitingAnswer ||
+      !problem ||
+      problem.bestMove === undefined ||
+      problem.bestMove === null
+    ) {
+      return;
+    }
+
+    const before = this.gobanFromSnapshot(this.history[problem.step - 1]);
+    if (index < 0 || index >= before.area || !before.legal(index)) {
+      this.els.reviewFeedback.textContent = t('reviewIllegal');
+      this.els.reviewFeedback.className = 'review-feedback incorrect';
+      return;
+    }
+
+    const token = this.reviewToken;
+    this.busy = true;
+    this.setThinking(true);
+    try {
+      let humanWin = problem.bestHumanWinrate ?? 0;
+      if (index !== problem.bestMove) {
+        const after = before.clone();
+        after.play(index);
+        const evaluation = await this.engine.evaluate(after, this.level);
+        if (token !== this.reviewToken) return;
+        humanWin = humanWinrate(problem.color, evaluation.winrate);
+      }
+
+      const correct =
+        index === problem.bestMove ||
+        humanWin >= (problem.bestHumanWinrate ?? 0) - REVIEW_CORRECT_TOLERANCE;
+
+      this.reviewAwaitingAnswer = false;
+      this.reviewReady = false;
+      this.board3d.setReviewMarkers(problem.playedMove, problem.bestMove);
+      this.board2d.setReviewMarkers(problem.playedMove, problem.bestMove);
+      this.els.reviewFeedback.className = `review-feedback ${
+        correct ? 'correct' : 'incorrect'
+      }`;
+      this.els.reviewFeedback.textContent = correct
+        ? `${t('reviewCorrect')} ${t('reviewBest', {
+            coord: this.formatIntersection(problem.bestMove)
+          })}`
+        : t('reviewIncorrect', {
+            coord: this.formatIntersection(problem.bestMove)
+          });
+      this.els.reviewNext.disabled =
+        this.reviewIndex >= this.reviewProblems.length - 1;
+      this.els.reviewContinue.disabled = false;
+    } catch (error) {
+      console.error('Review answer failed', error);
+      this.els.reviewFeedback.textContent = t('aiError');
+    } finally {
+      if (token === this.reviewToken) {
+        this.busy = false;
+        this.setThinking(false);
+      }
+    }
+  }
+
+  private async showNextReviewProblem(): Promise<void> {
+    if (!this.reviewActive || this.busy) return;
+    if (this.reviewIndex >= this.reviewProblems.length - 1) return;
+    await this.showReviewProblem(this.reviewIndex + 1, this.reviewToken);
+  }
+
+  private closeReview(): void {
+    if (!this.reviewActive) {
+      this.els.reviewModal.hidden = true;
+      return;
+    }
+    this.resetReviewState();
+    const returnIndex = Math.min(
+      this.reviewReturnIndex,
+      Math.max(0, this.history.length - 1)
+    );
+    this.currentHistoryIndex = returnIndex;
+    this.restoreSnapshot(this.history[returnIndex]);
+    this.clearHover();
+    this.evaluation = null;
+    this.updateReplayUI();
+    this.evalGraph.setCurrentStep(returnIndex);
+    this.render();
+    this.updateStatus();
+    this.showGameOverDialog();
+    this.scheduleBackgroundEvaluation();
+  }
+
+  private continueFromReview(): void {
+    if (!this.reviewActive) return;
+    const problem = this.reviewProblems[this.reviewIndex];
+    const beforeStep = problem
+      ? Math.max(0, problem.step - 1)
+      : Math.max(0, this.history.length - 1);
+    this.continueFromStep(beforeStep);
+  }
+
+  private continueFromStep(step: number): void {
+    this.resetReviewState();
+    this.clearQuizMarkers();
+    this.stopReplay();
+    this.clearHover();
+    this.hoverCache.clear();
+    this.cancelBackgroundEvaluation();
+
+    const safeStep = Math.max(0, Math.min(step, this.history.length - 1));
+    this.history = this.history.slice(0, safeStep + 1).map((snapshot) => ({
+      board: new Uint8Array(snapshot.board),
+      side: snapshot.side,
+      ko: snapshot.ko,
+      lastMove: snapshot.lastMove,
+      moves: snapshot.moves.map((move) => ({ ...move })),
+      moveRecord: snapshot.moveRecord ? { ...snapshot.moveRecord } : null,
+      comment: snapshot.comment,
+      evalPoint: snapshot.evalPoint ? { ...snapshot.evalPoint } : null
+    }));
+    this.currentHistoryIndex = this.history.length - 1;
+    this.goban = this.gobanFromSnapshot(this.history[this.currentHistoryIndex]);
+    this.gameOver = false;
+    this.evaluation = null;
+
+    this.evalGraph.clear();
+    for (const snapshot of this.history) {
+      if (snapshot.evalPoint) this.evalGraph.setPoint(snapshot.evalPoint);
+    }
+    this.evalGraph.setTotalMoves(this.history.length - 1);
+    this.evalGraph.setCurrentStep(this.currentHistoryIndex);
+
+    this.updateReplayUI();
+    this.render();
+    this.updateStatus();
+    this.persistConfig();
+    void this.refreshEvaluation(true);
+
+    const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
+    if (!this.isManualMode() && this.goban.side !== humanColor) {
+      void this.aiTurn();
+    }
+  }
+
+  private gobanFromSnapshot(snapshot: HistorySnapshot): Goban {
+    const goban = new Goban(this.goban.size, this.goban.komi);
+    goban.board = new Uint8Array(snapshot.board);
+    goban.side = snapshot.side;
+    goban.ko = snapshot.ko;
+    goban.lastMove = snapshot.lastMove;
+    goban.moves = snapshot.moves.map((move) => ({ ...move }));
+    return goban;
+  }
+
+  private async toggleQuiz(): Promise<void> {
+    if (this.reviewActive) return;
+    if (this.quizActive) {
+      this.clearQuizMarkers();
+      return;
+    }
+    if (!this.canQuiz()) return;
+    await this.showQuiz(false);
+  }
+
+  private async answerQuiz(): Promise<void> {
+    if (this.reviewActive) return;
+    if (this.quizActive) {
+      if (this.quizRevealed) {
+        this.clearQuizMarkers();
+      } else {
+        this.quizRevealed = true;
+        this.applyQuizMarkers();
+      }
+      return;
+    }
+    if (!this.canQuiz()) return;
+    await this.showQuiz(true);
+  }
+
+  private canQuiz(): boolean {
+    if (this.busy || this.gameOver || this.reviewActive) return false;
+    if (!this.isManualMode()) {
+      const humanColor = this.playerSide === 'black' ? BLACK : WHITE;
+      if (this.goban.side !== humanColor) return false;
+    }
+    return true;
+  }
+
+  private async showQuiz(revealed: boolean): Promise<void> {
+    const token = ++this.quizToken;
+    this.quizBusy = true;
+    this.busy = true;
+    this.setThinking(true);
+    try {
+      const evaluation = await this.engine.evaluate(this.goban, this.level);
+      if (token !== this.quizToken || this.reviewActive || this.gameOver) return;
+      const candidates = selectQuizCandidates(this.goban, evaluation);
+      if (candidates.length === 0) return;
+      this.quizCandidates = candidates;
+      this.quizActive = true;
+      this.quizRevealed = revealed;
+      this.applyQuizMarkers();
+    } catch (error) {
+      console.error('Quiz evaluation failed', error);
+      this.els.turn.textContent = t('aiError');
+    } finally {
+      if (token === this.quizToken) {
+        this.quizBusy = false;
+        this.busy = false;
+        this.setThinking(false);
+      }
+    }
+  }
+
+  private applyQuizMarkers(): void {
+    const revealedColors: Record<QuizRole, string> = {
+      best: '#3b82f6',
+      worst: '#ef4444',
+      random: '#ffffff'
+    };
+    const markers: BoardMarker[] = this.quizCandidates.map((candidate) => ({
+      index: candidate.index,
+      color: this.quizRevealed
+        ? revealedColors[candidate.role]
+        : '#f5c451'
+    }));
+    this.board3d.setQuizMarkers(markers);
+    this.board2d.setQuizMarkers(markers);
+    this.els.quiz.classList.toggle('active', this.quizActive);
+    this.els.answer.classList.toggle('active', this.quizActive && this.quizRevealed);
+  }
+
+  private clearQuizMarkers(): void {
+    const wasBusy = this.quizBusy;
+    this.quizToken++;
+    this.quizBusy = false;
+    this.quizActive = false;
+    this.quizRevealed = false;
+    this.quizCandidates = [];
+    this.board3d.setQuizMarkers([]);
+    this.board2d.setQuizMarkers([]);
+    this.els.quiz.classList.remove('active');
+    this.els.answer.classList.remove('active');
+    if (wasBusy) {
+      this.busy = false;
+      this.setThinking(false);
+    }
   }
 
   private applyLegendStyle(): void {
@@ -907,6 +1449,8 @@ export class GameController {
   }
 
   private startNewGame(): void {
+    this.resetReviewState();
+    this.clearQuizMarkers();
     this.stopReplay();
     this.clearHover();
     this.hoverCache.clear();
@@ -929,6 +1473,8 @@ export class GameController {
   }
 
   private changeBoardSize(): void {
+    this.resetReviewState();
+    this.clearQuizMarkers();
     this.stopReplay();
     this.clearHover();
     this.hoverCache.clear();
@@ -1060,7 +1606,9 @@ export class GameController {
   }
 
   startReplay(): void {
+    if (this.reviewActive) return;
     if (this.history.length <= 1) return;
+    this.clearQuizMarkers();
     if (this.currentHistoryIndex >= this.history.length - 1) {
       this.goToStep(0);
     }
@@ -1107,7 +1655,9 @@ export class GameController {
   }
 
   goToStep(step: number): void {
+    if (this.reviewActive) return;
     if (step < 0 || step >= this.history.length) return;
+    this.clearQuizMarkers();
     this.currentHistoryIndex = step;
     const snapshot = this.history[step];
     this.restoreSnapshot(snapshot);
@@ -1143,6 +1693,7 @@ export class GameController {
   }
 
   private async humanPlay(index: number): Promise<void> {
+    if (this.reviewActive) return;
     if (this.busy) return;
     this.stopReplay();
 
@@ -1158,6 +1709,7 @@ export class GameController {
       if (this.goban.side !== humanColor) return;
     }
     if (!this.goban.play(index)) return;
+    this.clearQuizMarkers();
 
     this.clearHover();
     this.hoverCache.clear();
@@ -1179,6 +1731,7 @@ export class GameController {
   }
 
   private async humanPass(): Promise<void> {
+    if (this.reviewActive) return;
     if (this.busy) return;
     this.stopReplay();
 
@@ -1198,6 +1751,7 @@ export class GameController {
     this.hoverCache.clear();
 
     this.goban.pass();
+    this.clearQuizMarkers();
     const record = this.goban.moves[this.goban.moves.length - 1];
     record.weight = 0.3;
 
@@ -1251,6 +1805,7 @@ export class GameController {
       }
 
       const aiRecord = this.goban.moves[this.goban.moves.length - 1];
+      this.clearQuizMarkers();
       this.recordSnapshot(aiRecord);
 
       try {
@@ -1285,7 +1840,9 @@ export class GameController {
   }
 
   private async undo(): Promise<void> {
+    if (this.reviewActive) return;
     if (this.busy) return;
+    this.clearQuizMarkers();
     this.stopReplay();
     this.clearHover();
     this.hoverCache.clear();
@@ -1314,6 +1871,7 @@ export class GameController {
   }
 
   private async refreshEvaluation(showThinking: boolean): Promise<void> {
+    if (this.reviewActive) return;
     const token = ++this.evaluationToken;
     if (showThinking) this.setThinking(true);
     try {
@@ -1340,7 +1898,7 @@ export class GameController {
   }
 
   private onHoverIntersection(index: number | null): void {
-    if (!this.hoverEvalEnabled || this.busy || this.gameOver) {
+    if (!this.hoverEvalEnabled || this.busy || this.gameOver || this.reviewActive) {
       if (this.hoverIndex !== null) this.clearHover();
       return;
     }
@@ -1411,6 +1969,7 @@ export class GameController {
       this.hoverPreviewEnabled &&
       !this.gameOver &&
       !this.busy &&
+      !this.reviewActive &&
       (this.isManualMode() || this.goban.side === humanColor);
     const state: RenderState = {
       goban: this.goban,
@@ -1543,6 +2102,7 @@ export class GameController {
   }
 
   private saveSGF(): void {
+    if (this.reviewActive) return;
     let resultStr = '';
     if (this.gameOver) {
       const score = this.goban.score();
@@ -1583,6 +2143,8 @@ export class GameController {
   }
 
   private async loadSGF(): Promise<void> {
+    this.resetReviewState();
+    this.clearQuizMarkers();
     const file = this.els.file.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
@@ -1690,7 +2252,7 @@ export class GameController {
 
   private scheduleBackgroundEvaluation(): void {
     this.cancelBackgroundEvaluation();
-    if (this.busy || this.isPlayingReplay || !this.evalGraphEnabled || this.bgEvalActive) {
+    if (this.busy || this.isPlayingReplay || !this.evalGraphEnabled || this.bgEvalActive || this.reviewActive) {
       return;
     }
     this.bgEvalTimer = window.setTimeout(() => void this.runBackgroundEvalStep(), 200);
@@ -1698,7 +2260,7 @@ export class GameController {
 
   private async runBackgroundEvalStep(): Promise<void> {
     this.bgEvalTimer = null;
-    if (this.busy || this.isPlayingReplay || !this.evalGraphEnabled || this.bgEvalActive) {
+    if (this.busy || this.isPlayingReplay || !this.evalGraphEnabled || this.bgEvalActive || this.reviewActive) {
       return;
     }
 

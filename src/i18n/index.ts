@@ -81,6 +81,10 @@ export interface Translations {
   undoTitle: string;
   eval: string;
   evalTitle: string;
+  quiz: string;
+  quizTitle: string;
+  answer: string;
+  answerTitle: string;
   toggleView2D: string;
   toggleView3D: string;
   toggleViewTitle: string;
@@ -112,6 +116,21 @@ export interface Translations {
   gameOver: string;
   gameOverTitle: string;
   byMargin: string;
+  review: string;
+  reviewTitle: string;
+  reviewProblem: string;
+  reviewAnalyzing: string;
+  reviewNoMistakes: string;
+  reviewQuestion: string;
+  reviewPick: string;
+  reviewCorrect: string;
+  reviewIncorrect: string;
+  reviewBest: string;
+  reviewIllegal: string;
+  reviewContinue: string;
+  reviewNext: string;
+  reviewLast: string;
+  reviewClose: string;
   even: string;
   preview: string;
   paddedNet: string;
@@ -224,6 +243,10 @@ const DICTIONARIES: Record<Language, Translations> = {
     undoTitle: 'Undo move',
     eval: 'Eval',
     evalTitle: 'Evaluate position with KataGo',
+    quiz: 'Quiz',
+    quizTitle: 'Mark several candidate moves',
+    answer: 'Answer',
+    answerTitle: 'Reveal: best blue, worst red, others white',
     toggleView2D: '2D',
     toggleView3D: '3D',
     toggleViewTitle: 'Toggle 2D / 3D view',
@@ -255,6 +278,21 @@ const DICTIONARIES: Record<Language, Translations> = {
     gameOver: 'Game over — {winner}{margin}',
     gameOverTitle: 'Game Over',
     byMargin: ' by {margin}',
+    review: 'Review',
+    reviewTitle: 'Game Review',
+    reviewProblem: 'Problem {current} / {total}',
+    reviewAnalyzing: 'Analyzing the game…',
+    reviewNoMistakes: 'No clear mistakes were found in this game.',
+    reviewQuestion: 'You played {coord}. Where should you have played?',
+    reviewPick: 'Click an intersection on the board.',
+    reviewCorrect: 'Correct!',
+    reviewIncorrect: 'Incorrect. The best move was {coord}.',
+    reviewBest: 'Best move: {coord}',
+    reviewIllegal: 'You cannot play there.',
+    reviewContinue: 'Continue from here',
+    reviewNext: 'Next problem',
+    reviewLast: 'This is the last problem.',
+    reviewClose: 'End review',
     even: 'Even',
     preview: 'Preview',
     paddedNet: 'padded 19x19 net',
@@ -362,6 +400,10 @@ const DICTIONARIES: Record<Language, Translations> = {
     undoTitle: '直前の着手を戻す',
     eval: '形勢判断',
     evalTitle: 'KataGo AIで局面を評価',
+    quiz: 'クイズ',
+    quizTitle: '候補の交点をいくつかマーク',
+    answer: '答え',
+    answerTitle: '答え: 最善 青 / 最悪 赤 / ランダム 白',
     toggleView2D: '2D',
     toggleView3D: '3D',
     toggleViewTitle: '2D / 3D 表示切替',
@@ -393,6 +435,21 @@ const DICTIONARIES: Record<Language, Translations> = {
     gameOver: '終局 — {winner}{margin}',
     gameOverTitle: '終局',
     byMargin: ' {margin}目勝ち',
+    review: 'ふりかえり',
+    reviewTitle: 'ふりかえり',
+    reviewProblem: '問題 {current} / {total}',
+    reviewAnalyzing: '局面を分析中…',
+    reviewNoMistakes: 'この対局に明確な悪手は見つかりませんでした。',
+    reviewQuestion: 'あなたは {coord} に打ちました。どこに打つべきでしたか？',
+    reviewPick: '盤面の交点をクリックしてください。',
+    reviewCorrect: '正解です！',
+    reviewIncorrect: '不正解です。最善手は {coord} でした。',
+    reviewBest: '最善手: {coord}',
+    reviewIllegal: 'そこには打てません。',
+    reviewContinue: 'この局面から続ける',
+    reviewNext: '次の問題',
+    reviewLast: '最後の問題です。',
+    reviewClose: 'ふりかえりを終了',
     even: '互角',
     preview: '予測',
     paddedNet: '19路補正モデル',
@@ -500,6 +557,10 @@ const DICTIONARIES: Record<Language, Translations> = {
     undoTitle: 'Deshacer jugada',
     eval: 'Evaluar',
     evalTitle: 'Evaluar posición con KataGo',
+    quiz: 'Quiz',
+    quizTitle: 'Marcar varias jugadas candidatas',
+    answer: 'Respuesta',
+    answerTitle: 'Mostrar: mejor azul, peor rojo, otras blanco',
     toggleView2D: '2D',
     toggleView3D: '3D',
     toggleViewTitle: 'Alternar vista 2D / 3D',
@@ -531,6 +592,21 @@ const DICTIONARIES: Record<Language, Translations> = {
     gameOver: 'Fin de partida — {winner}{margin}',
     gameOverTitle: 'Fin de la partida',
     byMargin: ' por {margin}',
+    review: 'Revisión',
+    reviewTitle: 'Revisión de la partida',
+    reviewProblem: 'Problema {current} / {total}',
+    reviewAnalyzing: 'Analizando la partida…',
+    reviewNoMistakes: 'No se encontraron errores claros en esta partida.',
+    reviewQuestion: 'Jugaste {coord}. ¿Dónde deberías haber jugado?',
+    reviewPick: 'Haz clic en una intersección del tablero.',
+    reviewCorrect: '¡Correcto!',
+    reviewIncorrect: 'Incorrecto. La mejor jugada era {coord}.',
+    reviewBest: 'Mejor jugada: {coord}',
+    reviewIllegal: 'No puedes jugar ahí.',
+    reviewContinue: 'Continuar desde aquí',
+    reviewNext: 'Siguiente problema',
+    reviewLast: 'Este es el último problema.',
+    reviewClose: 'Terminar revisión',
     even: 'Igualado',
     preview: 'Prevista',
     paddedNet: 'red 19x19 ajustada',
