@@ -1,7 +1,7 @@
 {
   "name": "gogame-3d",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.9.2",
   "description": "3D Go game with KataGo (TF.js), Babylon.js chess-piece stones, for web and Electron",
   "type": "module",
   "main": "electron/main.cjs",
